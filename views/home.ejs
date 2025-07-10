@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trang Home</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <h2>Chào mừng đến với cửa hàng</h2>
+        <p>Đây là trang chính của ứng dụng. Hãy khám phá các tính năng!</p>
+        <div class="links">
+            <% if (isLoggedIn) { %>
+                <a href="/homepage">Trang cá nhân</a>
+                <a href="/cart">Cửa hàng</a>
+            <% } else { %>
+                <a href="/login">Đăng nhập</a>
+                <a href="/register">Đăng ký</a>
+                <a href="/cart">Cửa hàng</a>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cửa hàng</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <%- include('partials/navbar') %>
+    <div class="container">
+        <h2>Cửa hàng</h2>
+        <a href="/homepage">Quay lại trang chủ</a>
+        <% if (error) { %>
+            <p class="error"><%= error %></p>
+        <% } %>
+        <h3>Danh sách sản phẩm</h3>
+        <table>
+            <tr>
+                <th>Tên</th>
+                <th>Giá</th>
+                <th>Số lượng</th>
+                <th>Hành động</th>
+            </tr>
+            <% products.forEach(product => { %>
+                <tr>
+                    <td><%= product.name %></td>
+                    <td><%= product.formattedPrice %></td>
+                    <td><%= product.quantity %></td>
+                    <td>
+                        <form action="/buy" method="POST">
+                            <input type="hidden" name="productId" value="<%= product.id %>">
+                            <input type="number" name="quantity" min="1" max="<%= product.quantity %>" required>
+                            <button type="submit">Mua</button>
+                        </form>
+                    </td>
+                </tr>
+            <% }) %>
+        </table>
+    </div>
+</body>
+</html>
