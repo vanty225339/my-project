@@ -4,9 +4,14 @@ const session = require('express-session');
 const authRoutes = require('./routes/auth');
 const homepageRoutes = require('./routes/homepage');
 const shopRoutes = require('./routes/cart');
+const adminRoutes = require('./routes/admin');
 const utils = require('./utils/utils');
+const postRoutes = require('./routes/posts');
+
 const app = express();
 const port = 3000;
+
+
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -17,14 +22,18 @@ app.use(session({
     saveUninitialized: false
 }));
 
-
 app.get('/', async (req, res) => {
-    const products = await utils.getAllProducts();
-    const isLoggedIn = !!req.session.user;
-    const username = req.session.user ? req.session.user.username : null;
-    res.render('home', { products, isLoggedIn, username, error: null });
+    try {
+        const products = await utils.getAllProducts();
+        const posts = await utils.getAllPosts();
+        const isLoggedIn = !!req.session.user;
+        const username = req.session.user ? req.session.user.username : null;
+        res.render('home', { products, posts, isLoggedIn, username, error: null });
+    } catch (error) {
+        console.error('Error loading home page:', error);
+        res.render('home', { products: [], posts: [], isLoggedIn: false, username: null, error: 'Lỗi khi tải trang' });
+    }
 });
-
 
 app.post('/add-to-cart', async (req, res) => {
     if (!req.session.user) {
@@ -38,8 +47,10 @@ app.post('/add-to-cart', async (req, res) => {
         res.redirect('/cart');
     } else {
         const products = await utils.getAllProducts();
+        const posts = await utils.getAllPosts();
         res.render('home', { 
             products, 
+            posts,
             error: result.error, 
             isLoggedIn: true, 
             username: req.session.user.username 
@@ -50,6 +61,8 @@ app.post('/add-to-cart', async (req, res) => {
 app.use('/', authRoutes);
 app.use('/', homepageRoutes);
 app.use('/', shopRoutes);
+app.use('/', adminRoutes);
+app.use('/', postRoutes);
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

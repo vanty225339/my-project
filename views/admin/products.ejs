@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý sản phẩm - Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #007bff;
+            padding: 8px 16px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 2px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.8;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .add-form {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Quản lý sản phẩm</h1>
+            <div class="nav-links">
+                <a href="/admin">Dashboard</a>
+                <a href="/admin/posts">Bài viết</a>
+                <a href="/">Trang chủ</a>
+                <a href="/logout" style="color: #dc3545;">Đăng xuất</a>
+            </div>
+        </div>
+
+        <!-- Hiển thị thông báo -->
+        <% if (success) { %>
+            <div class="alert alert-success">
+                ✅ <%= success %>
+            </div>
+        <% } %>
+
+        <% if (error) { %>
+            <div class="alert alert-danger">
+                ❌ <%= error %>
+            </div>
+        <% } %>
+
+        <!-- Thống kê -->
+        <div class="stats">
+            <h3>Tổng số sản phẩm: <%= products.length %></h3>
+        </div>
+
+        <!-- Form thêm sản phẩm -->
+        <div class="add-form">
+            <h3>Thêm sản phẩm mới</h3>
+            <form method="POST" action="/admin/products/add">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Tên sản phẩm:</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="price">Giá (VNĐ):</label>
+                        <input type="number" id="price" name="price" required min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Số lượng:</label>
+                        <input type="number" id="quantity" name="quantity" required min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="description">Mô tả:</label>
+                    <textarea id="description" name="description"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">➕ Thêm sản phẩm</button>
+            </form>
+        </div>
+
+        <!-- Danh sách sản phẩm -->
+        <h3>Danh sách sản phẩm</h3>
+        <% if (products && products.length > 0) { %>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên sản phẩm</th>
+                        <th>Giá</th>
+                        <th>Số lượng</th>
+                        <th>Mô tả</th>
+                        <th>Ngày tạo</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% products.forEach(product => { %>
+                        <tr>
+                            <td><%= product.id %></td>
+                            <td><%= product.name %></td>
+                            <td><%= product.price ? product.price.toLocaleString('vi-VN') : '0' %>đ</td>
+                            <td><%= product.quantity %></td>
+                            <td>
+                                <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<%= product.description || '' %>">
+                                    <%= product.description || 'Chưa có mô tả' %>
+                                </div>
+                            </td>
+                            <td><%= product.created_at ? new Date(product.created_at).toLocaleDateString('vi-VN') : 'N/A' %></td>
+                            <td>
+                                <button onclick="editProduct(<%= product.id %>, '<%= product.name.replace(/'/g, "\\'") %>', <%= product.price %>, <%= product.quantity %>, '<%= (product.description || '').replace(/'/g, "\\'") %>')" class="btn btn-primary">✏️ Sửa</button>
+                                <form method="POST" action="/admin/products/delete/<%= product.id %>" style="display: inline;" onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này?')">
+                                    <button type="submit" class="btn btn-danger">🗑️ Xóa</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        <% } else { %>
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h3>Chưa có sản phẩm nào</h3>
+                <p>Hãy thêm sản phẩm đầu tiên!</p>
+            </div>
+        <% } %>
+
+        <!-- Modal sửa sản phẩm -->
+        <div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 8px; width: 80%; max-width: 600px;">
+                <h3>Chỉnh sửa sản phẩm</h3>
+                <form id="editForm" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editName">Tên sản phẩm:</label>
+                            <input type="text" id="editName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editPrice">Giá (VNĐ):</label>
+                            <input type="number" id="editPrice" name="price" required min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="editQuantity">Số lượng:</label>
+                            <input type="number" id="editQuantity" name="quantity" required min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="editDescription">Mô tả:</label>
+                        <textarea id="editDescription" name="description"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">💾 Cập nhật</button>
+                    <button type="button" onclick="closeEditModal()" class="btn btn-secondary">❌ Hủy</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function editProduct(id, name, price, quantity, description) {
+            document.getElementById('editName').value = name;
+            document.getElementById('editPrice').value = price;
+            document.getElementById('editQuantity').value = quantity;
+            document.getElementById('editDescription').value = description;
+            document.getElementById('editForm').action = '/admin/products/update/' + id;
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // Đóng modal khi click bên ngoài
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target === modal) {
+                closeEditModal();
+            }
+        }
+    </script>
+</body>
+</html>

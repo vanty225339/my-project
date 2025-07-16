@@ -11,8 +11,18 @@ router.post('/login', async (req, res) => {
     const user = await authenticateUser(username, password);
     
     if (user) {
-        req.session.user = { id: user.id, username: user.username };
-        res.redirect('/homepage');
+        req.session.user = { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role || (user.username === 'admin' ? 'admin' : 'user')
+        };
+        
+        // Chuyển hướng admin đến trang admin
+        if (req.session.user.role === 'admin' || req.session.user.username === 'admin') {
+            res.redirect('/admin');
+        } else {
+            res.redirect('/homepage');
+        }
     } else {
         res.render('login', { 
             error: 'Tên đăng nhập hoặc mật khẩu không đúng', 
@@ -32,7 +42,11 @@ router.post('/register', async (req, res) => {
     
     if (result.success) {
         const user = await authenticateUser(username, password); // Lấy user vừa tạo
-        req.session.user = { id: user.id, username: user.username };
+        req.session.user = { 
+            id: user.id, 
+            username: user.username, 
+            role: user.role || 'user'
+        };
         res.redirect('/homepage');
     } else {
         res.render('register', { 

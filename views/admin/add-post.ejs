@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thêm bài viết - Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        .form-group #content {
+            height: 300px;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 5px rgba(0,123,255,0.3);
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.8;
+        }
+        .form-actions {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .required {
+            color: #dc3545;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .form-row {
+            display: flex;
+            gap: 20px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .preview-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #dee2e6;
+        }
+        .char-count {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Thêm bài viết mới</h1>
+            <a href="/admin/posts" class="btn btn-secondary">← Quay lại danh sách</a>
+        </div>
+
+        <% if (typeof error !== 'undefined') { %>
+            <div class="alert alert-danger">
+                ❌ <%= error %>
+            </div>
+        <% } %>
+
+        <form method="POST" action="/admin/posts/add" onsubmit="return validateForm()">
+            <div class="form-group">
+                <label for="title">Tiêu đề bài viết <span class="required">*</span></label>
+                <input type="text" id="title" name="title" required maxlength="255" 
+                       value="<%= typeof formData !== 'undefined' ? formData.title || '' : '' %>"
+                       onkeyup="updateCharCount('title', 255)">
+                <div class="char-count" id="title-count">0/255 ký tự</div>
+                <div class="help-text">Tiêu đề ngắn gọn và thu hút</div>
+            </div>
+
+            <div class="form-group">
+                <label for="excerpt">Tóm tắt bài viết</label>
+                <textarea id="excerpt" name="excerpt" maxlength="300" 
+                          placeholder="Viết tóm tắt ngắn gọn về nội dung bài viết..."
+                          onkeyup="updateCharCount('excerpt', 300)"><%= typeof formData !== 'undefined' ? formData.excerpt || '' : '' %></textarea>
+                <div class="char-count" id="excerpt-count">0/300 ký tự</div>
+                <div class="help-text">Tóm tắt này sẽ hiển thị trong danh sách bài viết</div>
+            </div>
+
+            <div class="form-group">
+                <label for="content">Nội dung bài viết <span class="required">*</span></label>
+                <textarea id="content" name="content" required 
+                          placeholder="Viết nội dung chi tiết của bài viết tại đây..."
+                          onkeyup="updateCharCount('content')"><%= typeof formData !== 'undefined' ? formData.content || '' : '' %></textarea>
+                <div class="char-count" id="content-count">0 ký tự</div>
+                <div class="help-text">Nội dung chi tiết của bài viết. Hỗ trợ văn bản thuần</div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="status">Trạng thái</label>
+                    <select id="status" name="status">
+                        <option value="draft" <%= (typeof formData !== 'undefined' && formData.status === 'draft') ? 'selected' : '' %>>
+                            Bản nháp
+                        </option>
+                        <option value="published" <%= (typeof formData !== 'undefined' && formData.status === 'published') || typeof formData === 'undefined' ? 'selected' : '' %>>
+                            Xuất bản ngay
+                        </option>
+                    </select>
+                    <div class="help-text">Chọn "Bản nháp" để lưu mà không xuất bản</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="author_info">Tác giả</label>
+                    <input type="text" id="author_info" value="<%= username || 'Quản trị viên' %>" readonly style="background-color: #f8f9fa;">
+                    <div class="help-text">Bài viết sẽ được đăng dưới tên này</div>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="form-group">
+                <label>Xem trước</label>
+                <div class="preview-box">
+                    <h3 id="preview-title">Tiêu đề sẽ hiển thị ở đây</h3>
+                    <p id="preview-excerpt" style="color: #666; font-style: italic;">Tóm tắt sẽ hiển thị ở đây</p>
+                    <div id="preview-content" style="line-height: 1.6;">Nội dung sẽ hiển thị ở đây</div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">💾 Lưu bài viết</button>
+                <a href="/admin/posts" class="btn btn-secondary">❌ Hủy</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function validateForm() {
+            const title = document.getElementById('title').value.trim();
+            const content = document.getElementById('content').value.trim();
+
+            if (!title) {
+                alert('Tiêu đề bài viết không được để trống!');
+                return false;
+            }
+
+            if (!content) {
+                alert('Nội dung bài viết không được để trống!');
+                return false;
+            }
+
+            if (title.length > 255) {
+                alert('Tiêu đề không được vượt quá 255 ký tự!');
+                return false;
+            }
+
+            return confirm('Bạn có chắc muốn lưu bài viết này?');
+        }
+
+        function updateCharCount(fieldId, maxLength = null) {
+            const field = document.getElementById(fieldId);
+            const countElement = document.getElementById(fieldId + '-count');
+            const length = field.value.length;
+            
+            if (maxLength) {
+                countElement.textContent = `${length}/${maxLength} ký tự`;
+                if (length > maxLength * 0.9) {
+                    countElement.style.color = '#dc3545';
+                } else {
+                    countElement.style.color = '#666';
+                }
+            } else {
+                countElement.textContent = `${length} ký tự`;
+            }
+            
+            // Update preview
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const title = document.getElementById('title').value || 'Tiêu đề sẽ hiển thị ở đây';
+            const excerpt = document.getElementById('excerpt').value || 'Tóm tắt sẽ hiển thị ở đây';
+            const content = document.getElementById('content').value || 'Nội dung sẽ hiển thị ở đây';
+            
+            document.getElementById('preview-title').textContent = title;
+            document.getElementById('preview-excerpt').textContent = excerpt;
+            document.getElementById('preview-content').textContent = content.substring(0, 500) + (content.length > 500 ? '...' : '');
+        }
+
+        // Event listeners for real-time preview
+        document.getElementById('title').addEventListener('input', updatePreview);
+        document.getElementById('excerpt').addEventListener('input', updatePreview);
+        document.getElementById('content').addEventListener('input', updatePreview);
+
+        // Initialize character counts and preview
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCharCount('title', 255);
+            updateCharCount('excerpt', 300);
+            updateCharCount('content');
+            updatePreview();
+        });
+    </script>
+</body>
+</html>

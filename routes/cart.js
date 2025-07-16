@@ -8,13 +8,18 @@ router.get('/cart', async (req, res) => {
     }
     const userId = req.session.user.id;
     const cartItems = await getCart(userId);
+    const products = await utils.getAllProducts();
+    const posts = await utils.getAllPosts();
+
     res.render('cart', { 
-        products: cartItems, 
-        error: null, 
-        isLoggedIn: true, 
+        products, 
+        posts,
+        error: result.error, 
+        isLoggedIn: false, 
         username: req.session.user.username 
     });
 });
+
 
 router.post('/buy', async (req, res) => {
     if (!req.session.user) {

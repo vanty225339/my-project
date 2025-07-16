@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= post.title %> - Cửa hàng của tôi</title>
+    <meta name="description" content="<%= post.excerpt || post.content.substring(0, 150) %>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+        }
+        .nav {
+            background-color: #0056b3;
+            padding: 0.5rem 0;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        .breadcrumb {
+            background: white;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .breadcrumb-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .breadcrumb a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        .post-article {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .post-header {
+            padding: 40px 40px 30px;
+            border-bottom: 1px solid #eee;
+        }
+        .post-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+        .post-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .post-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .post-slug {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 15px;
+            border-left: 3px solid #007bff;
+        }
+        .post-content {
+            padding: 40px;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #333;
+        }
+        .post-content p {
+            margin-bottom: 20px;
+        }
+        .post-content h1, 
+        .post-content h2, 
+        .post-content h3 {
+            color: #333;
+            margin: 30px 0 15px;
+        }
+        .post-content h1 {
+            font-size: 1.8rem;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .post-content h2 {
+            font-size: 1.5rem;
+        }
+        .post-content h3 {
+            font-size: 1.3rem;
+        }
+        .post-footer {
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        .back-to-posts {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 10px 20px;
+            border: 2px solid #007bff;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .back-to-posts:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .share-buttons {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .share-button {
+            display: inline-block;
+            margin: 0 5px;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: white;
+            font-size: 0.9rem;
+            transition: opacity 0.3s;
+        }
+        .share-button:hover {
+            opacity: 0.8;
+        }
+        .share-facebook { background-color: #3b5998; }
+        .share-twitter { background-color: #1da1f2; }
+        .share-copy { background-color: #28a745; }
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 10px;
+            }
+            .post-header,
+            .post-content,
+            .post-footer {
+                padding: 20px;
+            }
+            .post-title {
+                font-size: 1.5rem;
+            }
+            .post-content {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cửa hàng của tôi</h1>
+    </div>
+
+    <div class="nav">
+        <div class="nav-container">
+            <div>
+                <a href="/">🏠 Trang chủ</a>
+                <a href="/posts">📝 Bài viết</a>
+            </div>
+            <div>
+                <% if (isLoggedIn) { %>
+                    <span>Xin chào, <%= username %>!</span>
+                    <a href="/cart">🛒 Giỏ hàng</a>
+                    <% if (username === 'admin') { %>
+                        <a href="/admin">⚙️ Admin</a>
+                    <% } %>
+                    <a href="/logout">Đăng xuất</a>
+                <% } else { %>
+                    <a href="/login">Đăng nhập</a>
+                    <a href="/register">Đăng ký</a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Trang chủ</a> › 
+            <a href="/posts">Bài viết</a> › 
+            <strong><%= post.title %></strong>
+        </div>
+    </div>
+
+    <div class="container">
+        <article class="post-article">
+            <header class="post-header">
+                <h1 class="post-title"><%= post.title %></h1>
+                
+                <div class="post-meta">
+                    <div class="post-meta-item">
+                        <span>👤</span>
+                        <span><%= post.author_username || 'Admin' %></span>
+                    </div>
+                    <div class="post-meta-item">
+                        <span>📅</span>
+                        <span><%= new Date(post.created_at).toLocaleDateString('vi-VN', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        }) %></span>
+                    </div>
+                    <% if (post.updated_at && post.updated_at !== post.created_at) { %>
+                        <div class="post-meta-item">
+                            <span>✏️</span>
+                            <span>Cập nhật: <%= new Date(post.updated_at).toLocaleDateString('vi-VN') %></span>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="post-slug">
+                    <strong>URL:</strong> /posts/<%= post.slug %>
+                </div>
+            </header>
+
+            <div class="post-content">
+                <%- post.content.replace(/\n/g, '</p><p>').replace(/^/, '<p>').replace(/$/, '</p>') %>
+            </div>
+
+            <footer class="post-footer">
+                <a href="/posts" class="back-to-posts">
+                    ← Quay lại danh sách bài viết
+                </a>
+
+                <div class="share-buttons">
+                    <strong>Chia sẻ:</strong>
+                    <a href="#" onclick="shareOnFacebook()" class="share-button share-facebook">Facebook</a>
+                    <a href="#" onclick="shareOnTwitter()" class="share-button share-twitter">Twitter</a>
+                    <a href="#" onclick="copyLink()" class="share-button share-copy">Copy Link</a>
+                </div>
+            </footer>
+        </article>
+    </div>
+
+    <script>
+        function shareOnFacebook() {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank', 'width=600,height=400');
+        }
+
+        function shareOnTwitter() {
+            const url = encodeURIComponent(window.location.href);
+            const text = encodeURIComponent('<%= post.title %>');
+            window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
+        }
+
+        function copyLink() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('Đã copy link bài viết!');
+            }).catch(() => {
+                // Fallback cho trình duyệt không hỗ trợ clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = window.location.href;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Đã copy link bài viết!');
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài viết - Cửa hàng của tôi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 1rem 0;
+            text-align: center;
+        }
+        .nav {
+            background-color: #0056b3;
+            padding: 0.5rem 0;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .nav a:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .posts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+        .post-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .post-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .post-content {
+            padding: 20px;
+        }
+        .post-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .post-title a {
+            color: #333;
+            text-decoration: none;
+        }
+        .post-title a:hover {
+            color: #007bff;
+        }
+        .post-excerpt {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        .post-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+        }
+        .post-author {
+            font-weight: 500;
+        }
+        .post-date {
+            font-style: italic;
+        }
+        .read-more {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .read-more:hover {
+            text-decoration: underline;
+        }
+        .no-posts {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .no-posts h2 {
+            color: #999;
+            margin-bottom: 10px;
+        }
+        .breadcrumb {
+            background: white;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .breadcrumb-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        .breadcrumb a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cửa hàng của tôi</h1>
+    </div>
+
+    <div class="nav">
+        <div class="nav-container">
+            <div>
+                <a href="/">🏠 Trang chủ</a>
+                <a href="/posts">📝 Bài viết</a>
+            </div>
+            <div>
+                <% if (isLoggedIn) { %>
+                    <span>Xin chào, <%= username %>!</span>
+                    <a href="/cart">🛒 Giỏ hàng</a>
+                    <% if (username === 'admin') { %>
+                        <a href="/admin">⚙️ Admin</a>
+                    <% } %>
+                    <a href="/logout">Đăng xuất</a>
+                <% } else { %>
+                    <a href="/login">Đăng nhập</a>
+                    <a href="/register">Đăng ký</a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Trang chủ</a> › <strong>Bài viết</strong>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Tất cả bài viết</h2>
+        
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                ❌ <%= error %>
+            </div>
+        <% } %>
+
+        <% if (posts && posts.length > 0) { %>
+            <div class="posts-grid">
+                <% posts.forEach(post => { %>
+                    <article class="post-card">
+                        <div class="post-content">
+                            <h3 class="post-title">
+                                <a href="/posts/<%= post.slug %>"><%= post.title %></a>
+                            </h3>
+                            
+                            <% if (post.excerpt) { %>
+                                <div class="post-excerpt">
+                                    <%= post.excerpt %>
+                                </div>
+                            <% } else { %>
+                                <div class="post-excerpt">
+                                    <%= post.content.length > 150 ? post.content.substring(0, 150) + '...' : post.content %>
+                                </div>
+                            <% } %>
+                            
+                            <a href="/posts/<%= post.slug %>" class="read-more">
+                                Đọc tiếp →
+                            </a>
+                            
+                            <div class="post-meta">
+                                <span class="post-author">
+                                    👤 <%= post.author_username || 'Admin' %>
+                                </span>
+                                <span class="post-date">
+                                    📅 <%= new Date(post.created_at).toLocaleDateString('vi-VN') %>
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="no-posts">
+                <h2>📝 Chưa có bài viết nào</h2>
+                <p>Hiện tại chưa có bài viết nào được đăng. Hãy quay lại sau nhé!</p>
+                <a href="/" style="color: #007bff; text-decoration: none;">← Quay về trang chủ</a>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>

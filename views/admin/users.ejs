@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý người dùng - Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+        .nav-links a {
+            text-decoration: none;
+            color: #007bff;
+            padding: 8px 16px;
+            border: 1px solid #007bff;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        .nav-links a:hover {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 2px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn:hover {
+            opacity: 0.8;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .role-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .role-admin {
+            background-color: #dc3545;
+            color: white;
+        }
+        .role-user {
+            background-color: #28a745;
+            color: white;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        .search-box input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .add-form {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Quản lý người dùng</h1>
+            <div class="nav-links">
+                <a href="/admin">Dashboard</a>
+                <a href="/admin/products">Sản phẩm</a>
+                <a href="/admin/posts">Bài viết</a>
+                <a href="/">Trang chủ</a>
+                <a href="/logout" style="color: #dc3545;">Đăng xuất</a>
+            </div>
+        </div>
+
+        <!-- Hiển thị thông báo -->
+        <% if (success) { %>
+            <div class="alert alert-success">
+                ✅ <%= success %>
+            </div>
+        <% } %>
+
+        <% if (error) { %>
+            <div class="alert alert-danger">
+                ❌ <%= error %>
+            </div>
+        <% } %>
+
+        <!-- Thống kê -->
+        <div class="stats">
+            <h3>Tổng số người dùng: <%= users.length %></h3>
+        </div>
+
+        <!-- Form thêm user -->
+        <div class="add-form">
+            <h3>Thêm người dùng mới</h3>
+            <form method="POST" action="/admin/users/add">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Tên đăng nhập:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Mật khẩu:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="role">Quyền:</label>
+                        <select id="role" name="role">
+                            <option value="user">Người dùng</option>
+                            <option value="admin">Quản trị viên</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success">➕ Thêm người dùng</button>
+            </form>
+        </div>
+
+        <!-- Tìm kiếm -->
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Tìm kiếm người dùng..." onkeyup="searchUsers()">
+        </div>
+
+        <!-- Danh sách người dùng -->
+        <h3>Danh sách người dùng</h3>
+        <% if (users && users.length > 0) { %>
+            <table class="table" id="usersTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Tên đăng nhập</th>
+                        <th>Vai trò</th>
+                        <th>Ngày tạo</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% users.forEach(user => { %>
+                        <tr>
+                            <td><%= user.id %></td>
+                            <td><%= user.username %></td>
+                            <td>
+                                <span class="role-badge <%= user.role === 'admin' ? 'role-admin' : 'role-user' %>">
+                                    <%= user.role === 'admin' ? 'Quản trị viên' : 'Người dùng' %>
+                                </span>
+                            </td>
+                            <td><%= user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : 'N/A' %></td>
+                            <td>
+                                <% if (user.username !== 'admin') { %>
+                                    <form method="POST" action="/admin/users/toggle-role/<%= user.id %>" style="display: inline;" onsubmit="return confirm('Bạn có chắc muốn thay đổi quyền của người dùng này?')">
+                                        <button type="submit" class="btn btn-warning">
+                                            🔄 <%= user.role === 'admin' ? 'Hạ quyền' : 'Nâng quyền' %>
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="/admin/users/delete/<%= user.id %>" style="display: inline;" onsubmit="return confirm('Bạn có chắc muốn xóa người dùng này? Hành động này không thể hoàn tác!')">
+                                        <button type="submit" class="btn btn-danger">🗑️ Xóa</button>
+                                    </form>
+                                <% } else { %>
+                                    <span style="color: #666; font-style: italic;">Super Admin</span>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        <% } else { %>
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h3>Chưa có người dùng nào</h3>
+                <p>Hãy thêm người dùng đầu tiên!</p>
+            </div>
+        <% } %>
+    </div>
+
+    <script>
+        function searchUsers() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('usersTable');
+            const rows = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let found = false;
+                
+                // Tìm kiếm trong username và role
+                for (let j = 1; j < 3; j++) {
+                    if (cells[j] && cells[j].textContent.toLowerCase().indexOf(filter) > -1) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                rows[i].style.display = found ? '' : 'none';
+            }
+        }
+    </script>
+</body>
+</html>
