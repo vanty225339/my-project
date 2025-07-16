@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử giao dịch - VPS Cloud</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f8f9fa;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-decoration: none;
+            color: white;
+        }
+
+        .breadcrumb {
+            background: white;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .breadcrumb-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .breadcrumb a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .page-title {
+            text-align: center;
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .balance-card {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(40, 167, 69, 0.2);
+        }
+
+        .balance-amount {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .balance-label {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .transactions-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .filter-btn.active,
+        .filter-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .transactions-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .transaction-item:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .transaction-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .transaction-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        .transaction-icon.deposit {
+            background: #28a745;
+        }
+
+        .transaction-icon.payment {
+            background: #dc3545;
+        }
+
+        .transaction-icon.refund {
+            background: #17a2b8;
+        }
+
+        .transaction-details h4 {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .transaction-details p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 3px;
+        }
+
+        .transaction-amount {
+            text-align: right;
+        }
+
+        .amount {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .amount.positive {
+            color: #28a745;
+        }
+
+        .amount.negative {
+            color: #dc3545;
+        }
+
+        .transaction-time {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .method-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .method-card {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .method-bank {
+            background: #667eea;
+            color: white;
+        }
+
+        .method-admin {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .no-transactions {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .no-transactions i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .back-link:hover {
+            color: #764ba2;
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 10px;
+            }
+
+            .transactions-section {
+                padding: 20px;
+            }
+
+            .transaction-item {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+
+            .transaction-amount {
+                text-align: center;
+            }
+
+            .filter-buttons {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .balance-amount {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-container">
+            <a href="/" class="logo">
+                <i class="fas fa-server"></i>
+                VPS Cloud
+            </a>
+            <div>
+                <span>Xin chào, <%= username %>!</span>
+                <a href="/logout" style="color: white; text-decoration: none; margin-left: 20px;">
+                    <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="breadcrumb">
+        <div class="breadcrumb-container">
+            <a href="/">Trang chủ</a> › <strong>Lịch sử giao dịch</strong>
+        </div>
+    </div>
+
+    <div class="container">
+        <a href="/" class="back-link">
+            <i class="fas fa-arrow-left"></i>
+            Quay lại trang chủ
+        </a>
+
+        <h1 class="page-title">
+            <i class="fas fa-history"></i>
+            Lịch sử giao dịch
+        </h1>
+
+        <!-- Current Balance -->
+        <div class="balance-card">
+            <div class="balance-amount"><%= typeof balance !== 'undefined' ? new Intl.NumberFormat('vi-VN').format(balance) + 'đ' : '0đ' %></div>
+            <div class="balance-label">Số dư hiện tại</div>
+        </div>
+
+        <!-- Transactions Section -->
+        <div class="transactions-section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i class="fas fa-list"></i>
+                    Tất cả giao dịch
+                </h2>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" onclick="filterTransactions('all')">Tất cả</button>
+                    <button class="filter-btn" onclick="filterTransactions('deposit')">Nạp tiền</button>
+                    <button class="filter-btn" onclick="filterTransactions('payment')">Thanh toán</button>
+                    <button class="filter-btn" onclick="filterTransactions('refund')">Hoàn tiền</button>
+                </div>
+            </div>
+
+            <div class="transactions-list">
+                <% if (transactions && transactions.length > 0) { %>
+                    <% transactions.forEach(transaction => { %>
+                        <div class="transaction-item" data-type="<%= transaction.type %>">
+                            <div class="transaction-info">
+                                <div class="transaction-icon <%= transaction.type %>">
+                                    <% if (transaction.type === 'deposit') { %>
+                                        <i class="fas fa-plus"></i>
+                                    <% } else if (transaction.type === 'payment') { %>
+                                        <i class="fas fa-minus"></i>
+                                    <% } else { %>
+                                        <i class="fas fa-undo"></i>
+                                    <% } %>
+                                </div>
+                                <div class="transaction-details">
+                                    <h4><%= transaction.typeText %></h4>
+                                    <p><%= transaction.description %></p>
+                                    <% if (transaction.method) { %>
+                                        <span class="method-badge method-<%= transaction.method %>">
+                                            <%= transaction.method === 'card' ? 'Thẻ cào' : 
+                                                transaction.method === 'bank' ? 'Ngân hàng' : 'Admin' %>
+                                        </span>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <div class="transaction-amount">
+                                <div class="amount <%= transaction.amountClass %>">
+                                    <%= transaction.amount > 0 ? '+' : '' %><%= transaction.formattedAmount %>
+                                </div>
+                                <div class="transaction-time">
+                                    <%= new Date(transaction.created_at).toLocaleString('vi-VN') %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                <% } else { %>
+                    <div class="no-transactions">
+                        <i class="fas fa-receipt"></i>
+                        <h3>Chưa có giao dịch nào</h3>
+                        <p>Lịch sử giao dịch của bạn sẽ hiển thị tại đây.</p>
+                        <a href="/deposit" style="color: #667eea; text-decoration: none; font-weight: 600; margin-top: 15px; display: inline-block;">
+                            <i class="fas fa-plus"></i> Nạp tiền ngay
+                        </a>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function filterTransactions(type) {
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Filter transactions
+            const transactions = document.querySelectorAll('.transaction-item');
+            transactions.forEach(transaction => {
+                if (type === 'all' || transaction.dataset.type === type) {
+                    transaction.style.display = 'flex';
+                } else {
+                    transaction.style.display = 'none';
+                }
+            });
+        }
+
+        // Auto-refresh balance every 30 seconds
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/user/balance');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const balanceElement = document.querySelector('.balance-amount');
+                    const formattedBalance = new Intl.NumberFormat('vi-VN').format(data.balance) + 'đ';
+                    if (balanceElement.textContent !== formattedBalance) {
+                        balanceElement.textContent = formattedBalance;
+                        balanceElement.style.animation = 'pulse 0.5s';
+                        setTimeout(() => {
+                            balanceElement.style.animation = '';
+                        }, 500);
+                    }
+                }
+            } catch (error) {
+                console.log('Error refreshing balance:', error);
+            }
+        }, 30000);
+    </script>
+
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</body>
+</html>

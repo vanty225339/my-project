@@ -1,3 +1,0 @@
-npm run dev ;chạy  ; để chạy node full
-
-npm install -->> để cài các modules

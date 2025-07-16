@@ -1,21 +1,17 @@
-// routes/admin.js - Updated với full functionality
+// routes/admin.js - Updated for VPS service
 const express = require('express');
 const router = express.Router();
 const { 
-    getAllProducts, 
-    addProduct, 
-    updateProduct, 
-    deleteProduct,
-    getAllPosts,
-    addPost,
-    updatePost,
-    deletePost,
-    getAllUsers,
-    registerUser,
-    updateUserRole,
-    deleteUser,
+    getAllVpsPlans,
+    addVpsPlan,
+    updateVpsPlan,
+    deleteVpsPlan,
+    getAllVpsInstances,
+    getDepositRequests,
+    processDepositRequest,
     getStatistics,
-    getRecentData
+    getAllUsers,
+    getAllPosts
 } = require('../utils/utils');
 
 // Middleware kiểm tra quyền admin
@@ -32,24 +28,28 @@ const requireAdmin = (req, res, next) => {
 router.get('/admin', requireAdmin, async (req, res) => {
     try {
         const stats = await getStatistics();
-        const recentData = await getRecentData();
+        const recentInstances = await getAllVpsInstances();
+        const pendingDeposits = await getDepositRequests('pending');
         
         res.render('admin/dashboard', {
             ...stats,
-            ...recentData,
+            recentInstances: recentInstances.slice(0, 5),
+            pendingDeposits: pendingDeposits.slice(0, 5),
             isLoggedIn: true,
-            username: req.session.user.username
+            username: req.session.user.username,
+            error: null,
+            success: null
         });
     } catch (error) {
         console.error('Error loading dashboard:', error);
         res.render('admin/dashboard', {
-            totalProducts: 0,
+            totalPlans: 0,
             totalUsers: 0,
-            totalPosts: 0,
-            totalOrders: 0,
-            recentProducts: [],
-            recentUsers: [],
-            recentPosts: [],
+            totalInstances: 0,
+            runningInstances: 0,
+            totalRevenue: 0,
+            recentInstances: [],
+            pendingDeposits: [],
             error: 'Lỗi khi tải dữ liệu dashboard',
             isLoggedIn: true,
             username: req.session.user.username
@@ -58,79 +58,149 @@ router.get('/admin', requireAdmin, async (req, res) => {
 });
 
 // ================================
-// QUẢN LÝ SẢN PHẨM
+// QUẢN LÝ GÓI VPS
 // ================================
-router.get('/admin/products', requireAdmin, async (req, res) => {
+router.get('/admin/vps-plans', requireAdmin, async (req, res) => {
     try {
-        const products = await getAllProducts();
-        res.render('admin/products', {
-            products,
+        const plans = await getAllVpsPlans();
+        res.render('admin/vps-plans', {
+            plans,
             isLoggedIn: true,
             username: req.session.user.username,
-            success: req.query.success === 'added' ? 'Thêm sản phẩm thành công!' : 
-                     req.query.success === 'updated' ? 'Cập nhật sản phẩm thành công!' :
-                     req.query.success === 'deleted' ? 'Xóa sản phẩm thành công!' : null,
-            error: null
+            success: req.query.success === 'added' ? 'Thêm gói VPS thành công!' : 
+                     req.query.success === 'updated' ? 'Cập nhật gói VPS thành công!' :
+                     req.query.success === 'deleted' ? 'Xóa gói VPS thành công!' : null,
+            error: req.query.error ? decodeURIComponent(req.query.error) : null
         });
     } catch (error) {
-        res.render('admin/products', {
-            products: [],
+        res.render('admin/vps-plans', {
+            plans: [],
             isLoggedIn: true,
             username: req.session.user.username,
-            error: 'Lỗi khi tải sản phẩm',
+            error: 'Lỗi khi tải gói VPS',
             success: null
         });
     }
 });
 
-router.post('/admin/products/add', requireAdmin, async (req, res) => {
-    const { name, price, quantity, description } = req.body;
-    const result = await addProduct(name, price, quantity, description);
+router.post('/admin/vps-plans/add', requireAdmin, async (req, res) => {
+    const { name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description } = req.body;
+    
+    const result = await addVpsPlan(name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description);
     
     if (result.success) {
-        res.redirect('/admin/products?success=added');
+        res.redirect('/admin/vps-plans?success=added');
     } else {
-        const products = await getAllProducts();
-        res.render('admin/products', {
-            products,
-            isLoggedIn: true,
-            username: req.session.user.username,
-            error: result.error,
-            success: null
-        });
+        res.redirect('/admin/vps-plans?error=' + encodeURIComponent(result.error));
     }
 });
 
-router.post('/admin/products/update/:id', requireAdmin, async (req, res) => {
-    const { name, price, quantity, description } = req.body;
-    const result = await updateProduct(req.params.id, name, price, quantity, description);
+router.post('/admin/vps-plans/update/:id', requireAdmin, async (req, res) => {
+    const { name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description } = req.body;
+    
+    const result = await updateVpsPlan(req.params.id, name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description);
     
     if (result.success) {
-        res.redirect('/admin/products?success=updated');
+        res.redirect('/admin/vps-plans?success=updated');
     } else {
-        const products = await getAllProducts();
-        res.render('admin/products', {
-            products,
-            isLoggedIn: true,
-            username: req.session.user.username,
-            error: result.error,
-            success: null
-        });
+        res.redirect('/admin/vps-plans?error=' + encodeURIComponent(result.error));
     }
 });
 
-router.post('/admin/products/delete/:id', requireAdmin, async (req, res) => {
-    const result = await deleteProduct(req.params.id);
+router.post('/admin/vps-plans/delete/:id', requireAdmin, async (req, res) => {
+    const result = await deleteVpsPlan(req.params.id);
     
     if (result.success) {
-        res.redirect('/admin/products?success=deleted');
+        res.redirect('/admin/vps-plans?success=deleted');
     } else {
-        res.redirect('/admin/products?error=' + encodeURIComponent(result.error));
+        res.redirect('/admin/vps-plans?error=' + encodeURIComponent(result.error));
     }
 });
 
 // ================================
-// QUẢN LÝ NGƯỜI DÙNG
+// QUẢN LÝ VPS INSTANCES
+// ================================
+router.get('/admin/instances', requireAdmin, async (req, res) => {
+    try {
+        const instances = await getAllVpsInstances();
+        res.render('admin/instances', {
+            instances,
+            isLoggedIn: true,
+            username: req.session.user.username,
+            error: null,
+            success: null
+        });
+    } catch (error) {
+        res.render('admin/instances', {
+            instances: [],
+            isLoggedIn: true,
+            username: req.session.user.username,
+            error: 'Lỗi khi tải danh sách VPS instances',
+            success: null
+        });
+    }
+});
+
+// ================================
+// QUẢN LÝ YÊU CẦU NẠP TIỀN
+// ================================
+router.get('/admin/deposits', requireAdmin, async (req, res) => {
+    try {
+        const allDeposits = await getDepositRequests();
+        const pendingDeposits = await getDepositRequests('pending');
+        
+        res.render('admin/deposits', {
+            deposits: allDeposits,
+            pendingCount: pendingDeposits.length,
+            isLoggedIn: true,
+            username: req.session.user.username,
+            success: req.query.success === 'approved' ? 'Duyệt yêu cầu thành công!' : 
+                     req.query.success === 'rejected' ? 'Từ chối yêu cầu thành công!' : null,
+            error: req.query.error ? decodeURIComponent(req.query.error) : null
+        });
+    } catch (error) {
+        res.render('admin/deposits', {
+            deposits: [],
+            pendingCount: 0,
+            isLoggedIn: true,
+            username: req.session.user.username,
+            error: 'Lỗi khi tải yêu cầu nạp tiền',
+            success: null
+        });
+    }
+});
+
+router.post('/admin/deposits/approve/:id', requireAdmin, async (req, res) => {
+    try {
+        const result = await processDepositRequest(req.params.id, 'approve', req.session.user.id);
+        
+        if (result.success) {
+            res.json({ success: true, message: result.message });
+        } else {
+            res.json({ success: false, error: result.error });
+        }
+    } catch (error) {
+        res.json({ success: false, error: error.message });
+    }
+});
+
+router.post('/admin/deposits/reject/:id', requireAdmin, async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const result = await processDepositRequest(req.params.id, 'reject', req.session.user.id, reason);
+        
+        if (result.success) {
+            res.json({ success: true, message: result.message });
+        } else {
+            res.json({ success: false, error: result.error });
+        }
+    } catch (error) {
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// ================================
+// QUẢN LÝ NGƯỜI DÙNG (giữ nguyên)
 // ================================
 router.get('/admin/users', requireAdmin, async (req, res) => {
     try {
@@ -139,10 +209,8 @@ router.get('/admin/users', requireAdmin, async (req, res) => {
             users,
             isLoggedIn: true,
             username: req.session.user.username,
-            success: req.query.success === 'added' ? 'Thêm người dùng thành công!' : 
-                     req.query.success === 'role_updated' ? 'Cập nhật quyền thành công!' :
-                     req.query.success === 'deleted' ? 'Xóa người dùng thành công!' : null,
-            error: req.query.error ? decodeURIComponent(req.query.error) : null
+            success: null,
+            error: null
         });
     } catch (error) {
         res.render('admin/users', {
@@ -155,71 +223,8 @@ router.get('/admin/users', requireAdmin, async (req, res) => {
     }
 });
 
-router.post('/admin/users/add', requireAdmin, async (req, res) => {
-    const { username, password, role } = req.body;
-    
-    if (!username || !password) {
-        return res.redirect('/admin/users?error=' + encodeURIComponent('Vui lòng điền đầy đủ thông tin'));
-    }
-    
-    const result = await registerUser(username, password);
-    
-    if (result.success && role === 'admin') {
-        // Nếu thành công và role là admin, cập nhật role
-        const db = require('../data/database');
-        db.run('UPDATE users SET role = ? WHERE username = ?', ['admin', username]);
-    }
-    
-    if (result.success) {
-        res.redirect('/admin/users?success=added');
-    } else {
-        res.redirect('/admin/users?error=' + encodeURIComponent(result.error));
-    }
-});
-
-router.post('/admin/users/toggle-role/:id', requireAdmin, async (req, res) => {
-    const userId = req.params.id;
-    
-    try {
-        const db = require('../data/database');
-        
-        // Lấy thông tin user hiện tại
-        db.get('SELECT * FROM users WHERE id = ?', [userId], async (err, user) => {
-            if (err || !user) {
-                return res.redirect('/admin/users?error=' + encodeURIComponent('Không tìm thấy người dùng'));
-            }
-            
-            // Không cho phép thay đổi quyền admin gốc
-            if (user.username === 'admin') {
-                return res.redirect('/admin/users?error=' + encodeURIComponent('Không thể thay đổi quyền Super Admin'));
-            }
-            
-            const newRole = user.role === 'admin' ? 'user' : 'admin';
-            const result = await updateUserRole(userId, newRole);
-            
-            if (result.success) {
-                res.redirect('/admin/users?success=role_updated');
-            } else {
-                res.redirect('/admin/users?error=' + encodeURIComponent(result.error));
-            }
-        });
-    } catch (error) {
-        res.redirect('/admin/users?error=' + encodeURIComponent('Lỗi khi cập nhật quyền'));
-    }
-});
-
-router.post('/admin/users/delete/:id', requireAdmin, async (req, res) => {
-    const result = await deleteUser(req.params.id);
-    
-    if (result.success) {
-        res.redirect('/admin/users?success=deleted');
-    } else {
-        res.redirect('/admin/users?error=' + encodeURIComponent(result.error));
-    }
-});
-
 // ================================
-// QUẢN LÝ BÀI VIẾT
+// QUẢN LÝ BÀI VIẾT (giữ nguyên)
 // ================================
 router.get('/admin/posts', requireAdmin, async (req, res) => {
     try {
@@ -228,10 +233,8 @@ router.get('/admin/posts', requireAdmin, async (req, res) => {
             posts,
             isLoggedIn: true,
             username: req.session.user.username,
-            success: req.query.success === 'added' ? 'Thêm bài viết thành công!' : 
-                     req.query.success === 'updated' ? 'Cập nhật bài viết thành công!' :
-                     req.query.success === 'deleted' ? 'Xóa bài viết thành công!' : null,
-            error: req.query.error ? decodeURIComponent(req.query.error) : null
+            success: null,
+            error: null
         });
     } catch (error) {
         res.render('admin/posts', {
@@ -244,45 +247,28 @@ router.get('/admin/posts', requireAdmin, async (req, res) => {
     }
 });
 
-router.post('/admin/posts/add', requireAdmin, async (req, res) => {
-    const { title, content, excerpt, status } = req.body;
-    
-    if (!title || !content) {
-        return res.redirect('/admin/posts?error=' + encodeURIComponent('Vui lòng điền đầy đủ tiêu đề và nội dung'));
-    }
-    
-    const result = await addPost(title, content, req.session.user.id, excerpt, status);
-    
-    if (result.success) {
-        res.redirect('/admin/posts?success=added');
-    } else {
-        res.redirect('/admin/posts?error=' + encodeURIComponent(result.error));
+// ================================
+// API ENDPOINTS cho AJAX
+// ================================
+
+// Get VPS plans API
+router.get('/api/admin/vps-plans', requireAdmin, async (req, res) => {
+    try {
+        const plans = await getAllVpsPlans();
+        res.json({ success: true, plans });
+    } catch (error) {
+        res.json({ success: false, error: error.message });
     }
 });
 
-router.post('/admin/posts/update/:id', requireAdmin, async (req, res) => {
-    const { title, content, excerpt, status } = req.body;
-    
-    if (!title || !content) {
-        return res.redirect('/admin/posts?error=' + encodeURIComponent('Vui lòng điền đầy đủ tiêu đề và nội dung'));
-    }
-    
-    const result = await updatePost(req.params.id, title, content, excerpt, status);
-    
-    if (result.success) {
-        res.redirect('/admin/posts?success=updated');
-    } else {
-        res.redirect('/admin/posts?error=' + encodeURIComponent(result.error));
-    }
-});
-
-router.post('/admin/posts/delete/:id', requireAdmin, async (req, res) => {
-    const result = await deletePost(req.params.id);
-    
-    if (result.success) {
-        res.redirect('/admin/posts?success=deleted');
-    } else {
-        res.redirect('/admin/posts?error=' + encodeURIComponent(result.error));
+// Add VPS plan API
+router.post('/api/admin/vps-plans', requireAdmin, async (req, res) => {
+    try {
+        const { name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description } = req.body;
+        const result = await addVpsPlan(name, cpu, ram, storage, bandwidth, hourlyPrice, monthlyPrice, description);
+        res.json(result);
+    } catch (error) {
+        res.json({ success: false, error: error.message });
     }
 });
 

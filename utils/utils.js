@@ -1,21 +1,27 @@
-// utils/utils.js - Enhanced version
+// utils/utils.js - Enhanced với SEO, Media Upload và User Management
 const db = require('../data/database');
 const { promisify } = require('util');
+const path = require('path');
+const fs = require('fs').promises;
 
 // Database lệnh
 const dbRun = promisify(db.run.bind(db));
 const dbGet = promisify(db.get.bind(db));
 const dbAll = promisify(db.all.bind(db));
 
-// Hàm kiểm tra thông tin đăng nhập
+// ================================
+// AUTHENTICATION FUNCTIONS
+// ================================
+
 const authenticateUser = async (username, password) => {
     try {
         const user = await dbGet('SELECT * FROM users WHERE username = ? AND password = ?', [username, password]);
         if (user) {
-            // Kiểm tra xem có cột role không, nếu không thì gán mặc định
             if (!user.role) {
                 user.role = username === 'admin' ? 'admin' : 'user';
             }
+            // Update last login
+            await dbRun('UPDATE users SET last_login = datetime("now") WHERE id = ?', [user.id]);
         }
         return user || null;
     } catch (err) {
@@ -24,230 +30,229 @@ const authenticateUser = async (username, password) => {
     }
 };
 
-// Hàm đăng ký người dùng mới
-const registerUser = async (username, password) => {
+const registerUser = async (username, password, email = null, fullName = null, phone = null) => {
     try {
-        const existingUser = await dbGet('SELECT * FROM users WHERE username = ?', [username]);
+        const existingUser = await dbGet('SELECT * FROM users WHERE username = ? OR email = ?', [username, email]);
         if (existingUser) {
-            return { success: false, error: 'Tên đăng nhập đã tồn tại' };
+            return { success: false, error: 'Tên đăng nhập hoặc email đã tồn tại' };
         }
-        await dbRun('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, password, 'user']);
+        
+        await dbRun(`INSERT INTO users (username, password, email, full_name, phone, role, balance, status) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
+                     [username, password, email, fullName, phone, 'user', 0, 'active']);
         return { success: true, message: 'Đăng ký thành công' };
     } catch (err) {
         return { success: false, error: 'Lỗi khi đăng ký: ' + err.message };
     }
 };
 
-// Hàm định dạng giá tiền sang VNĐ
-const formatPrice = (price) => {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND'
-    }).format(price);
-};
-
 // ================================
-// CART FUNCTIONS
+// USER MANAGEMENT FUNCTIONS
 // ================================
 
-const addToCart = async (userId, productId, quantity) => {
+const getAllUsers = async () => {
     try {
-        const product = await dbGet('SELECT * FROM products WHERE id = ?', [productId]);
-        if (!product) {
-            return { success: false, error: 'Sản phẩm không tồn tại' };
-        }
-        if (product.quantity < quantity) {
-            return { success: false, error: 'Không đủ số lượng sản phẩm' };
-        }
-        const existingCartItem = await dbGet('SELECT * FROM cart WHERE user_id = ? AND product_id = ?', [userId, productId]);
-        if (existingCartItem) {
-            await dbRun('UPDATE cart SET quantity = quantity + ? WHERE user_id = ? AND product_id = ?', [quantity, userId, productId]);
-        } else {
-            await dbRun('INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)', [userId, productId, quantity]);
-        }
-        return { success: true, message: 'Đã thêm vào giỏ hàng' };
+        return await dbAll(`SELECT id, username, email, full_name, phone, role, balance, status, 
+                           last_login, created_at FROM users ORDER BY created_at DESC`);
     } catch (err) {
-        return { success: false, error: 'Lỗi khi thêm vào giỏ hàng: ' + err.message };
-    }
-};
-
-const getCart = async (userId) => {
-    try {
-        const cartItems = await dbAll(`
-            SELECT c.id, c.product_id, c.quantity, p.name, p.price
-            FROM cart c
-            JOIN products p ON c.product_id = p.id
-            WHERE c.user_id = ?
-        `, [userId]);
-        return cartItems.map(item => ({
-            ...item,
-            formattedPrice: formatPrice(item.price),
-            totalPrice: formatPrice(item.price * item.quantity)
-        }));
-    } catch (err) {
-        console.error('Error getting cart:', err);
+        console.error('Error getting all users:', err);
         return [];
     }
 };
 
-const getCartItems = async (userId) => {
+const getUserById = async (id) => {
     try {
-        return await dbAll(`
-            SELECT c.*, p.name, p.price 
-            FROM cart c 
-            JOIN products p ON c.product_id = p.id 
-            WHERE c.user_id = ?
-        `, [userId]);
+        return await dbGet(`SELECT id, username, email, full_name, phone, role, balance, status, 
+                           last_login, created_at FROM users WHERE id = ?`, [id]);
     } catch (err) {
-        console.error('Error getting cart items:', err);
-        return [];
-    }
-};
-
-const removeFromCart = async (userId, productId) => {
-    try {
-        await dbRun('DELETE FROM cart WHERE user_id = ? AND product_id = ?', [userId, productId]);
-        return { success: true, message: 'Đã xóa khỏi giỏ hàng' };
-    } catch (err) {
-        return { success: false, error: 'Lỗi khi xóa khỏi giỏ hàng: ' + err.message };
-    }
-};
-
-const updateCartQuantity = async (userId, productId, quantity) => {
-    try {
-        if (quantity <= 0) {
-            await dbRun('DELETE FROM cart WHERE user_id = ? AND product_id = ?', [userId, productId]);
-        } else {
-            await dbRun('UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?', 
-                [quantity, userId, productId]);
-        }
-        return { success: true, message: 'Cập nhật giỏ hàng thành công' };
-    } catch (err) {
-        return { success: false, error: 'Lỗi khi cập nhật giỏ hàng: ' + err.message };
-    }
-};
-
-// Hàm xử lý logic mua hàng
-const processPurchase = async (userId) => {
-    try {
-        const cartItems = await dbAll(`
-            SELECT c.product_id, c.quantity, p.quantity as stock
-            FROM cart c
-            JOIN products p ON c.product_id = p.id
-            WHERE c.user_id = ?
-        `, [userId]);
-
-        if (cartItems.length === 0) {
-            return { success: false, error: 'Giỏ hàng trống' };
-        }
-
-        // Kiểm tra số lượng tồn kho
-        for (const item of cartItems) {
-            if (item.stock < item.quantity) {
-                return { success: false, error: 'Không đủ số lượng tồn kho' };
-            }
-        }
-
-        // Cập nhật số lượng sản phẩm
-        for (const item of cartItems) {
-            await dbRun('UPDATE products SET quantity = quantity - ? WHERE id = ?', [item.quantity, item.product_id]);
-        }
-
-        // Xóa giỏ hàng
-        await dbRun('DELETE FROM cart WHERE user_id = ?', [userId]);
-
-        return { success: true, message: 'Mua hàng thành công' };
-    } catch (err) {
-        return { success: false, error: 'Lỗi khi mua hàng: ' + err.message };
-    }
-};
-
-// ================================
-// PRODUCT FUNCTIONS
-// ================================
-
-const getAllProducts = async () => {
-    try {
-        // Sử dụng ORDER BY id DESC để tránh lỗi nếu chưa có cột created_at
-        const products = await dbAll('SELECT * FROM products ORDER BY id DESC');
-        return products.map(product => ({
-            ...product,
-            formattedPrice: formatPrice(product.price)
-        }));
-    } catch (err) {
-        console.error('Error getting all products:', err);
-        return [];
-    }
-};
-
-const getProductById = async (id) => {
-    try {
-        const product = await dbGet('SELECT * FROM products WHERE id = ?', [id]);
-        if (product) {
-            product.formattedPrice = formatPrice(product.price);
-        }
-        return product;
-    } catch (err) {
-        console.error('Error getting product by ID:', err);
+        console.error('Error getting user by ID:', err);
         return null;
     }
 };
 
-// Hàm quản lý sản phẩm cho admin
-const addProduct = async (name, price, quantity, description) => {
+const addUser = async (userData) => {
     try {
-        if (!name || !price || quantity === undefined) {
-            return { success: false, error: 'Vui lòng điền đầy đủ thông tin sản phẩm' };
+        const { username, password, email, fullName, phone, role, initialBalance } = userData;
+        
+        if (!username || !password) {
+            return { success: false, error: 'Tên đăng nhập và mật khẩu không được để trống' };
         }
         
-        const query = `INSERT INTO products (name, price, quantity, description, created_at) 
-                       VALUES (?, ?, ?, ?, datetime('now'))`;
-        await dbRun(query, [name, price, quantity, description || '']);
-        return { success: true, message: 'Thêm sản phẩm thành công' };
+        const existingUser = await dbGet('SELECT * FROM users WHERE username = ? OR email = ?', [username, email]);
+        if (existingUser) {
+            return { success: false, error: 'Tên đăng nhập hoặc email đã tồn tại' };
+        }
+        
+        const result = await dbRun(`INSERT INTO users 
+            (username, password, email, full_name, phone, role, balance, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [username, password, email || null, fullName || null, phone || null, 
+             role || 'user', initialBalance || 0, 'active']);
+        
+        return { success: true, message: 'Tạo người dùng thành công', userId: result.lastID };
     } catch (err) {
-        return { success: false, error: 'Lỗi khi thêm sản phẩm: ' + err.message };
+        return { success: false, error: 'Lỗi khi tạo người dùng: ' + err.message };
     }
 };
 
-const updateProduct = async (id, name, price, quantity, description) => {
+const updateUser = async (id, userData) => {
     try {
-        if (!name || !price || quantity === undefined) {
-            return { success: false, error: 'Vui lòng điền đầy đủ thông tin sản phẩm' };
-        }
+        const { username, email, fullName, phone, role, status } = userData;
         
-        const result = await dbRun('UPDATE products SET name = ?, price = ?, quantity = ?, description = ? WHERE id = ?', 
-            [name, price, quantity, description || '', id]);
+        const result = await dbRun(`UPDATE users SET 
+            username = ?, email = ?, full_name = ?, phone = ?, role = ?, status = ?, 
+            updated_at = datetime('now') WHERE id = ?`,
+            [username, email, fullName, phone, role, status, id]);
+        
         if (result.changes === 0) {
-            return { success: false, error: 'Không tìm thấy sản phẩm' };
+            return { success: false, error: 'Không tìm thấy người dùng' };
         }
-        return { success: true, message: 'Cập nhật sản phẩm thành công' };
+        return { success: true, message: 'Cập nhật người dùng thành công' };
     } catch (err) {
-        return { success: false, error: 'Lỗi khi cập nhật sản phẩm: ' + err.message };
+        return { success: false, error: 'Lỗi khi cập nhật người dùng: ' + err.message };
     }
 };
 
-const deleteProduct = async (id) => {
+const deleteUser = async (id) => {
     try {
-        const result = await dbRun('DELETE FROM products WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return { success: false, error: 'Không tìm thấy sản phẩm' };
+        // Kiểm tra xem có phải admin gốc không
+        const user = await dbGet('SELECT * FROM users WHERE id = ?', [id]);
+        if (user && user.username === 'admin') {
+            return { success: false, error: 'Không thể xóa tài khoản admin gốc' };
         }
-        return { success: true, message: 'Xóa sản phẩm thành công' };
+        
+        // Check if user has active VPS instances
+        const activeInstances = await dbGet('SELECT COUNT(*) as count FROM vps_instances WHERE user_id = ? AND status = "running"', [id]);
+        if (activeInstances.count > 0) {
+            return { success: false, error: 'Không thể xóa người dùng đang có VPS hoạt động' };
+        }
+        
+        const result = await dbRun('DELETE FROM users WHERE id = ?', [id]);
+        if (result.changes === 0) {
+            return { success: false, error: 'Không tìm thấy người dùng' };
+        }
+        return { success: true, message: 'Xóa người dùng thành công' };
     } catch (err) {
-        return { success: false, error: 'Lỗi khi xóa sản phẩm: ' + err.message };
+        return { success: false, error: 'Lỗi khi xóa người dùng: ' + err.message };
     }
 };
 
 // ================================
-// POST FUNCTIONS
+// WALLET MANAGEMENT FUNCTIONS
+// ================================
+
+const getUserBalance = async (userId) => {
+    try {
+        const user = await dbGet('SELECT balance FROM users WHERE id = ?', [userId]);
+        return user ? user.balance : 0;
+    } catch (err) {
+        console.error('Error getting user balance:', err);
+        return 0;
+    }
+};
+
+const addUserBalance = async (userId, amount, adminId, reason, note = '') => {
+    try {
+        const user = await dbGet('SELECT balance FROM users WHERE id = ?', [userId]);
+        if (!user) {
+            return { success: false, error: 'Người dùng không tồn tại' };
+        }
+
+        const oldBalance = user.balance;
+        const newBalance = oldBalance + amount;
+        
+        // Update user balance
+        await dbRun('UPDATE users SET balance = ?, updated_at = datetime("now") WHERE id = ?', [newBalance, userId]);
+        
+        // Record transaction
+        await dbRun(`INSERT INTO user_transactions 
+            (user_id, admin_id, type, amount, balance_before, balance_after, reason, note) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, adminId, 'add', amount, oldBalance, newBalance, reason, note]);
+
+        // Record in wallet_transactions for consistency
+        await dbRun(`INSERT INTO wallet_transactions 
+            (user_id, type, method, amount, balance_before, balance_after, description) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [userId, 'deposit', 'admin', amount, oldBalance, newBalance, 
+             `Admin cộng tiền: ${reason} ${note ? '- ' + note : ''}`]);
+
+        return { success: true, message: 'Cộng tiền thành công', newBalance: newBalance };
+    } catch (err) {
+        return { success: false, error: 'Lỗi khi cộng tiền: ' + err.message };
+    }
+};
+
+const subtractUserBalance = async (userId, amount, adminId, reason, note = '') => {
+    try {
+        const user = await dbGet('SELECT balance FROM users WHERE id = ?', [userId]);
+        if (!user) {
+            return { success: false, error: 'Người dùng không tồn tại' };
+        }
+
+        const oldBalance = user.balance;
+        const newBalance = oldBalance - amount;
+        
+        if (newBalance < 0) {
+            return { success: false, error: 'Số dư không đủ để thực hiện giao dịch' };
+        }
+        
+        // Update user balance
+        await dbRun('UPDATE users SET balance = ?, updated_at = datetime("now") WHERE id = ?', [newBalance, userId]);
+        
+        // Record transaction
+        await dbRun(`INSERT INTO user_transactions 
+            (user_id, admin_id, type, amount, balance_before, balance_after, reason, note) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, adminId, 'subtract', amount, oldBalance, newBalance, reason, note]);
+
+        // Record in wallet_transactions for consistency
+        await dbRun(`INSERT INTO wallet_transactions 
+            (user_id, type, method, amount, balance_before, balance_after, description) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [userId, 'payment', 'admin', -amount, oldBalance, newBalance, 
+             `Admin trừ tiền: ${reason} ${note ? '- ' + note : ''}`]);
+
+        return { success: true, message: 'Trừ tiền thành công', newBalance: newBalance };
+    } catch (err) {
+        return { success: false, error: 'Lỗi khi trừ tiền: ' + err.message };
+    }
+};
+
+const getUserTransactions = async (userId, limit = 50) => {
+    try {
+        const transactions = await dbAll(`
+            SELECT ut.*, u.username as admin_username 
+            FROM user_transactions ut
+            LEFT JOIN users u ON ut.admin_id = u.id 
+            WHERE ut.user_id = ? 
+            ORDER BY ut.created_at DESC 
+            LIMIT ?
+        `, [userId, limit]);
+
+        return transactions.map(tx => ({
+            ...tx,
+            amount: tx.type === 'add' ? Math.abs(tx.amount) : -Math.abs(tx.amount),
+            formattedAmount: formatPrice(Math.abs(tx.amount))
+        }));
+    } catch (err) {
+        console.error('Error getting user transactions:', err);
+        return [];
+    }
+};
+
+// ================================
+// POSTS MANAGEMENT WITH SEO
 // ================================
 
 const getAllPosts = async () => {
     try {
         const posts = await dbAll(`
-            SELECT p.*, u.username as author_name, u.username as author_username 
+            SELECT p.*, u.username as author_name, u.username as author_username,
+                   c.name as category_name
             FROM posts p 
             LEFT JOIN users u ON p.author_id = u.id 
+            LEFT JOIN categories c ON p.category_id = c.id
             ORDER BY p.created_at DESC
         `);
         return posts;
@@ -260,9 +265,11 @@ const getAllPosts = async () => {
 const getPostById = async (id) => {
     try {
         return await dbGet(`
-            SELECT p.*, u.username as author_name, u.username as author_username 
+            SELECT p.*, u.username as author_name, u.username as author_username,
+                   c.name as category_name 
             FROM posts p 
             LEFT JOIN users u ON p.author_id = u.id 
+            LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.id = ?
         `, [id]);
     } catch (err) {
@@ -271,45 +278,85 @@ const getPostById = async (id) => {
     }
 };
 
-const addPost = async (title, content, authorId, excerpt = '', status = 'published') => {
+const getPostBySlug = async (slug) => {
     try {
-        if (!title || !content) {
-            return { success: false, error: 'Vui lòng điền đầy đủ tiêu đề và nội dung' };
-        }
+        // Increment view count
+        await dbRun('UPDATE posts SET view_count = view_count + 1 WHERE slug = ?', [slug]);
         
-        // Tạo slug unique từ title
-        const slug = await generateUniqueSlug(title);
-        
-        await dbRun('INSERT INTO posts (title, slug, content, excerpt, status, author_id) VALUES (?, ?, ?, ?, ?, ?)', 
-            [title, slug, content, excerpt, status, authorId]);
-        return { success: true, message: 'Thêm bài viết thành công' };
+        return await dbGet(`
+            SELECT p.*, u.username as author_name, u.username as author_username,
+                   c.name as category_name 
+            FROM posts p 
+            LEFT JOIN users u ON p.author_id = u.id 
+            LEFT JOIN categories c ON p.category_id = c.id
+            WHERE p.slug = ? AND p.status = 'published'
+        `, [slug]);
     } catch (err) {
-        return { success: false, error: 'Lỗi khi thêm bài viết: ' + err.message };
+        console.error('Error getting post by slug:', err);
+        return null;
     }
 };
 
-const updatePost = async (id, title, content, excerpt = '', status = 'published') => {
+const addPost = async (postData) => {
     try {
+        const { title, content, excerpt, metaTitle, metaDescription, metaKeywords, 
+                featuredImage, authorId, categoryId, tags, status, publishDate } = postData;
+        
         if (!title || !content) {
-            return { success: false, error: 'Vui lòng điền đầy đủ tiêu đề và nội dung' };
+            return { success: false, error: 'Tiêu đề và nội dung không được để trống' };
         }
         
-        // Lấy thông tin post hiện tại
+        // Generate unique slug
+        const slug = await generateUniqueSlug(title);
+        
+        const publishedAt = status === 'published' ? 'datetime("now")' : 
+                           status === 'scheduled' && publishDate ? `"${publishDate}"` : null;
+        
+        const result = await dbRun(`INSERT INTO posts 
+            (title, slug, content, excerpt, meta_title, meta_description, meta_keywords,
+             featured_image, author_id, category_id, tags, status, published_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${publishedAt})`,
+            [title, slug, content, excerpt, metaTitle, metaDescription, metaKeywords,
+             featuredImage, authorId, categoryId || null, tags, status]);
+        
+        return { success: true, message: 'Tạo bài viết thành công', postId: result.lastID, slug: slug };
+    } catch (err) {
+        return { success: false, error: 'Lỗi khi tạo bài viết: ' + err.message };
+    }
+};
+
+const updatePost = async (id, postData) => {
+    try {
+        const { title, content, excerpt, metaTitle, metaDescription, metaKeywords,
+                featuredImage, categoryId, tags, status, publishDate } = postData;
+        
+        if (!title || !content) {
+            return { success: false, error: 'Tiêu đề và nội dung không được để trống' };
+        }
+        
+        // Get current post
         const currentPost = await dbGet('SELECT title, slug FROM posts WHERE id = ?', [id]);
         if (!currentPost) {
             return { success: false, error: 'Không tìm thấy bài viết' };
         }
         
         let slug = currentPost.slug;
-        
-        // Nếu title thay đổi, tạo slug mới
+        // If title changed, generate new slug
         if (currentPost.title !== title) {
             slug = await generateUniqueSlug(title, id);
         }
         
-        const result = await dbRun(
-            'UPDATE posts SET title = ?, slug = ?, content = ?, excerpt = ?, status = ?, updated_at = datetime(\'now\') WHERE id = ?', 
-            [title, slug, content, excerpt, status, id]);
+        const publishedAt = status === 'published' ? 'datetime("now")' : 
+                           status === 'scheduled' && publishDate ? `"${publishDate}"` : null;
+        
+        const result = await dbRun(`UPDATE posts SET 
+            title = ?, slug = ?, content = ?, excerpt = ?, meta_title = ?, 
+            meta_description = ?, meta_keywords = ?, featured_image = ?, 
+            category_id = ?, tags = ?, status = ?, published_at = ${publishedAt},
+            updated_at = datetime('now') WHERE id = ?`,
+            [title, slug, content, excerpt, metaTitle, metaDescription, metaKeywords,
+             featuredImage, categoryId || null, tags, status, id]);
+        
         if (result.changes === 0) {
             return { success: false, error: 'Không tìm thấy bài viết' };
         }
@@ -332,179 +379,304 @@ const deletePost = async (id) => {
 };
 
 // ================================
-// USER FUNCTIONS (mới thêm)
+// CATEGORIES MANAGEMENT
 // ================================
 
-const getAllUsers = async () => {
+const getAllCategories = async () => {
     try {
-        return await dbAll('SELECT id, username, role, created_at FROM users ORDER BY id DESC');
+        return await dbAll('SELECT * FROM categories WHERE status = "active" ORDER BY sort_order ASC, name ASC');
     } catch (err) {
-        console.error('Error getting all users:', err);
+        console.error('Error getting categories:', err);
         return [];
     }
 };
 
-const getUserById = async (id) => {
+const addCategory = async (name, slug, description, parentId = null) => {
     try {
-        return await dbGet('SELECT id, username, role, created_at FROM users WHERE id = ?', [id]);
-    } catch (err) {
-        console.error('Error getting user by ID:', err);
-        return null;
-    }
-};
-
-const updateUserRole = async (id, role) => {
-    try {
-        const result = await dbRun('UPDATE users SET role = ? WHERE id = ?', [role, id]);
-        if (result.changes === 0) {
-            return { success: false, error: 'Không tìm thấy người dùng' };
-        }
-        return { success: true, message: 'Cập nhật quyền người dùng thành công' };
-    } catch (err) {
-        return { success: false, error: 'Lỗi khi cập nhật quyền: ' + err.message };
-    }
-};
-
-const deleteUser = async (id) => {
-    try {
-        // Kiểm tra xem có phải admin gốc không
-        const user = await dbGet('SELECT * FROM users WHERE id = ?', [id]);
-        if (user && user.username === 'admin') {
-            return { success: false, error: 'Không thể xóa tài khoản admin gốc' };
+        if (!name) {
+            return { success: false, error: 'Tên danh mục không được để trống' };
         }
         
-        const result = await dbRun('DELETE FROM users WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return { success: false, error: 'Không tìm thấy người dùng' };
+        const existingCategory = await dbGet('SELECT * FROM categories WHERE name = ? OR slug = ?', [name, slug]);
+        if (existingCategory) {
+            return { success: false, error: 'Tên hoặc slug danh mục đã tồn tại' };
         }
-        return { success: true, message: 'Xóa người dùng thành công' };
+        
+        const result = await dbRun(`INSERT INTO categories (name, slug, description, parent_id, status) 
+                                    VALUES (?, ?, ?, ?, ?)`,
+                                    [name, slug, description, parentId, 'active']);
+        
+        return { success: true, message: 'Tạo danh mục thành công', categoryId: result.lastID };
     } catch (err) {
-        return { success: false, error: 'Lỗi khi xóa người dùng: ' + err.message };
+        return { success: false, error: 'Lỗi khi tạo danh mục: ' + err.message };
     }
 };
 
 // ================================
-// STATISTICS FUNCTIONS (mới thêm)
+// MEDIA MANAGEMENT
 // ================================
 
-const getStatistics = async () => {
+const saveMediaFile = async (fileInfo, uploadedBy) => {
     try {
-        const totalProducts = await dbGet('SELECT COUNT(*) as count FROM products');
-        const totalUsers = await dbGet('SELECT COUNT(*) as count FROM users');
-        const totalPosts = await dbGet('SELECT COUNT(*) as count FROM posts');
-        const totalOrders = 0; // Placeholder vì chưa có bảng orders
-
-        return {
-            totalProducts: totalProducts.count || 0,
-            totalUsers: totalUsers.count || 0,
-            totalPosts: totalPosts.count || 0,
-            totalOrders: totalOrders
-        };
+        const { filename, originalName, mimeType, size, path: filePath, url, altText, title, description } = fileInfo;
+        
+        const result = await dbRun(`INSERT INTO media 
+            (filename, original_name, mime_type, size, path, url, alt_text, title, description, uploaded_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [filename, originalName, mimeType, size, filePath, url, altText, title, description, uploadedBy]);
+        
+        return { success: true, mediaId: result.lastID, url: url };
     } catch (err) {
-        console.error('Error getting statistics:', err);
-        return {
-            totalProducts: 0,
-            totalUsers: 0,
-            totalPosts: 0,
-            totalOrders: 0
-        };
+        return { success: false, error: 'Lỗi khi lưu thông tin media: ' + err.message };
     }
 };
 
-const getRecentData = async () => {
+const getMediaFiles = async (uploadedBy = null, limit = 50) => {
     try {
-        const recentProducts = await dbAll('SELECT * FROM products ORDER BY id DESC LIMIT 5');
-        const recentUsers = await dbAll('SELECT id, username, role, created_at FROM users ORDER BY id DESC LIMIT 5');
-        const recentPosts = await dbAll(`
-            SELECT p.*, u.username as author_username 
-            FROM posts p 
-            LEFT JOIN users u ON p.author_id = u.id 
-            ORDER BY p.created_at DESC 
-            LIMIT 5
-        `);
-
-        return {
-            recentProducts: recentProducts || [],
-            recentUsers: recentUsers || [],
-            recentPosts: recentPosts || []
-        };
+        let query = 'SELECT * FROM media';
+        let params = [];
+        
+        if (uploadedBy) {
+            query += ' WHERE uploaded_by = ?';
+            params.push(uploadedBy);
+        }
+        
+        query += ' ORDER BY created_at DESC LIMIT ?';
+        params.push(limit);
+        
+        return await dbAll(query, params);
     } catch (err) {
-        console.error('Error getting recent data:', err);
-        return {
-            recentProducts: [],
-            recentUsers: [],
-            recentPosts: []
-        };
-    }
-};
-
-// ================================
-// SEARCH FUNCTIONS (mới thêm)
-// ================================
-
-const searchProducts = async (query) => {
-    try {
-        const products = await dbAll(
-            'SELECT * FROM products WHERE name LIKE ? OR description LIKE ? ORDER BY id DESC',
-            [`%${query}%`, `%${query}%`]
-        );
-        return products.map(product => ({
-            ...product,
-            formattedPrice: formatPrice(product.price)
-        }));
-    } catch (err) {
-        console.error('Error searching products:', err);
+        console.error('Error getting media files:', err);
         return [];
     }
 };
 
-const getPostBySlug = async (slug) => {
+// ================================
+// VPS FUNCTIONS (từ artifact trước - giữ nguyên)
+// ================================
+
+const getAllVpsPlans = async () => {
     try {
-        return await dbGet(`
-            SELECT p.*, u.username as author_name, u.username as author_username 
-            FROM posts p 
-            LEFT JOIN users u ON p.author_id = u.id 
-            WHERE p.slug = ? AND p.status = 'published'
-        `, [slug]);
+        const plans = await dbAll('SELECT * FROM vps_plans WHERE status = "active" ORDER BY hourly_price ASC');
+        return plans.map(plan => ({
+            ...plan,
+            formattedHourlyPrice: formatPrice(plan.hourly_price),
+            formattedMonthlyPrice: formatPrice(plan.monthly_price),
+            specs: `${plan.cpu} CPU, ${plan.ram}GB RAM, ${plan.storage}GB SSD, ${plan.bandwidth}GB Bandwidth`
+        }));
     } catch (err) {
-        console.error('Error getting post by slug:', err);
+        console.error('Error getting VPS plans:', err);
+        return [];
+    }
+};
+
+const getVpsPlanById = async (id) => {
+    try {
+        const plan = await dbGet('SELECT * FROM vps_plans WHERE id = ?', [id]);
+        if (plan) {
+            plan.formattedHourlyPrice = formatPrice(plan.hourly_price);
+            plan.formattedMonthlyPrice = formatPrice(plan.monthly_price);
+        }
+        return plan;
+    } catch (err) {
+        console.error('Error getting VPS plan by ID:', err);
         return null;
     }
 };
 
-const searchPosts = async (query) => {
+const createVpsInstance = async (userId, planId, name, hours) => {
     try {
-        return await dbAll(`
-            SELECT p.*, u.username as author_username 
-            FROM posts p 
-            LEFT JOIN users u ON p.author_id = u.id 
-            WHERE p.title LIKE ? OR p.content LIKE ? OR p.slug LIKE ?
-            ORDER BY p.created_at DESC
-        `, [`%${query}%`, `%${query}%`, `%${query}%`]);
+        const plan = await getVpsPlanById(planId);
+        if (!plan) {
+            return { success: false, error: 'Gói VPS không tồn tại' };
+        }
+
+        const user = await dbGet('SELECT balance FROM users WHERE id = ?', [userId]);
+        if (!user) {
+            return { success: false, error: 'Người dùng không tồn tại' };
+        }
+
+        const totalCost = plan.hourly_price * hours;
+        if (user.balance < totalCost) {
+            return { success: false, error: `Số dư không đủ. Cần ${formatPrice(totalCost)}, hiện có ${formatPrice(user.balance)}` };
+        }
+
+        const startTime = new Date().toISOString();
+        const endTime = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+        
+        const serverIp = generateRandomIP();
+        const rootPassword = generateRandomPassword();
+
+        // Create VPS instance
+        const result = await dbRun(`INSERT INTO vps_instances 
+            (user_id, plan_id, name, server_ip, root_password, start_time, end_time, total_cost, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [userId, planId, name, serverIp, rootPassword, startTime, endTime, totalCost, 'creating']);
+
+        // Deduct money from account
+        await dbRun('UPDATE users SET balance = balance - ? WHERE id = ?', [totalCost, userId]);
+
+        // Record transaction
+        await dbRun(`INSERT INTO wallet_transactions 
+            (user_id, type, amount, balance_before, balance_after, description) 
+            VALUES (?, ?, ?, ?, ?, ?)`,
+            [userId, 'payment', -totalCost, user.balance, user.balance - totalCost, 
+             `Thuê VPS ${name} - ${hours} giờ`]);
+
+        // Simulate VPS creation
+        setTimeout(async () => {
+            await dbRun('UPDATE vps_instances SET status = ? WHERE id = ?', ['running', result.lastID]);
+        }, 5000);
+
+        return { 
+            success: true, 
+            message: 'Tạo VPS thành công',
+            instanceId: result.lastID,
+            serverIp: serverIp,
+            rootPassword: rootPassword
+        };
     } catch (err) {
-        console.error('Error searching posts:', err);
+        return { success: false, error: 'Lỗi khi tạo VPS: ' + err.message };
+    }
+};
+
+const getUserVpsInstances = async (userId) => {
+    try {
+        const instances = await dbAll(`
+            SELECT vi.*, vp.name as plan_name, vp.cpu, vp.ram, vp.storage 
+            FROM vps_instances vi 
+            JOIN vps_plans vp ON vi.plan_id = vp.id 
+            WHERE vi.user_id = ? 
+            ORDER BY vi.created_at DESC
+        `, [userId]);
+
+        return instances.map(instance => ({
+            ...instance,
+            formattedCost: formatPrice(instance.total_cost),
+            timeRemaining: getTimeRemaining(instance.end_time),
+            isExpired: new Date() > new Date(instance.end_time)
+        }));
+    } catch (err) {
+        console.error('Error getting user VPS instances:', err);
         return [];
     }
 };
 
 // ================================
-// UTILITY FUNCTIONS (mới thêm)
+// DEPOSIT FUNCTIONS (từ artifact trước - giữ nguyên)
 // ================================
 
-// Hàm tạo slug từ tiêu đề
+const createDepositRequest = async (userId, method, amount, details) => {
+    try {
+        if (amount < 10000) {
+            return { success: false, error: 'Số tiền nạp tối thiểu là 10,000 VNĐ' };
+        }
+
+        const detailsJson = JSON.stringify(details);
+        
+        const result = await dbRun(`INSERT INTO deposit_requests 
+            (user_id, method, amount, ${method === 'card' ? 'card_info' : 'bank_info'}) 
+            VALUES (?, ?, ?, ?)`,
+            [userId, method, amount, detailsJson]);
+
+        return { 
+            success: true, 
+            message: 'Tạo yêu cầu nạp tiền thành công. Vui lòng chờ admin xử lý.',
+            requestId: result.lastID
+        };
+    } catch (err) {
+        return { success: false, error: 'Lỗi khi tạo yêu cầu nạp tiền: ' + err.message };
+    }
+};
+
+const getDepositRequests = async (status = null) => {
+    try {
+        let query = `
+            SELECT dr.*, u.username 
+            FROM deposit_requests dr 
+            JOIN users u ON dr.user_id = u.id
+        `;
+        let params = [];
+
+        if (status) {
+            query += ' WHERE dr.status = ?';
+            params.push(status);
+        }
+
+        query += ' ORDER BY dr.created_at DESC';
+
+        const requests = await dbAll(query, params);
+        return requests.map(req => ({
+            ...req,
+            formattedAmount: formatPrice(req.amount),
+            cardInfo: req.card_info ? JSON.parse(req.card_info) : null,
+            bankInfo: req.bank_info ? JSON.parse(req.bank_info) : null
+        }));
+    } catch (err) {
+        console.error('Error getting deposit requests:', err);
+        return [];
+    }
+};
+
+const processDepositRequest = async (requestId, action, adminId, note = '') => {
+    try {
+        const request = await dbGet('SELECT * FROM deposit_requests WHERE id = ?', [requestId]);
+        if (!request) {
+            return { success: false, error: 'Yêu cầu nạp tiền không tồn tại' };
+        }
+
+        if (request.status !== 'pending') {
+            return { success: false, error: 'Yêu cầu này đã được xử lý' };
+        }
+
+        if (action === 'approve') {
+            // Add money to account
+            const result = await addUserBalance(request.user_id, request.amount, adminId, 
+                `Nạp tiền ${request.method === 'card' ? 'qua thẻ cào' : 'chuyển khoản'}`, note);
+            
+            if (!result.success) {
+                return result;
+            }
+        }
+
+        // Update request status
+        await dbRun(`UPDATE deposit_requests 
+            SET status = ?, admin_note = ?, processed_by = ?, processed_at = datetime('now') 
+            WHERE id = ?`,
+            [action === 'approve' ? 'approved' : 'rejected', note, adminId, requestId]);
+
+        return { 
+            success: true, 
+            message: action === 'approve' ? 'Duyệt yêu cầu nạp tiền thành công' : 'Từ chối yêu cầu nạp tiền'
+        };
+    } catch (err) {
+        return { success: false, error: 'Lỗi khi xử lý yêu cầu: ' + err.message };
+    }
+};
+
+// ================================
+// UTILITY FUNCTIONS
+// ================================
+
+const formatPrice = (price) => {
+    return new Intl.NumberFormat('vi-VN', {
+        style: 'currency',
+        currency: 'VND'
+    }).format(price);
+};
+
 const createSlug = (title) => {
     return title
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu
-        .replace(/[đĐ]/g, 'd') // Thay đ/Đ thành d
-        .replace(/[^a-z0-9\s-]/g, '') // Chỉ giữ lại chữ, số, space, dấu gạch ngang
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .replace(/[^a-z0-9\s-]/g, '')
         .trim()
-        .replace(/\s+/g, '-') // Thay space thành dấu gạch ngang
-        .replace(/-+/g, '-'); // Loại bỏ dấu gạch ngang liên tiếp
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
 };
 
-// Hàm kiểm tra slug có tồn tại không
 const checkSlugExists = async (slug, excludeId = null) => {
     try {
         let query = 'SELECT COUNT(*) as count FROM posts WHERE slug = ?';
@@ -523,7 +695,6 @@ const checkSlugExists = async (slug, excludeId = null) => {
     }
 };
 
-// Hàm tạo slug unique
 const generateUniqueSlug = async (title, excludeId = null) => {
     let baseSlug = createSlug(title);
     let finalSlug = baseSlug;
@@ -537,94 +708,120 @@ const generateUniqueSlug = async (title, excludeId = null) => {
     return finalSlug;
 };
 
-const validateProduct = (name, price, quantity) => {
-    const errors = [];
-    
-    if (!name || name.trim().length === 0) {
-        errors.push('Tên sản phẩm không được để trống');
-    }
-    
-    if (!price || isNaN(price) || parseFloat(price) < 0) {
-        errors.push('Giá sản phẩm phải là số dương');
-    }
-    
-    if (quantity === undefined || isNaN(quantity) || parseInt(quantity) < 0) {
-        errors.push('Số lượng phải là số không âm');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
+const generateRandomIP = () => {
+    return `103.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
 };
 
-const validatePost = (title, content) => {
-    const errors = [];
-    
-    if (!title || title.trim().length === 0) {
-        errors.push('Tiêu đề không được để trống');
+const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
-    if (!content || content.trim().length === 0) {
-        errors.push('Nội dung không được để trống');
-    }
-    
-    if (title && title.length > 255) {
-        errors.push('Tiêu đề không được vượt quá 255 ký tự');
-    }
-    
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
+    return password;
 };
 
-// Xuất các hàm để sử dụng ở nơi khác
+const getTimeRemaining = (endTime) => {
+    const now = new Date();
+    const end = new Date(endTime);
+    const diff = end - now;
+    
+    if (diff <= 0) return 'Đã hết hạn';
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+        return `${hours} giờ ${minutes} phút`;
+    } else {
+        return `${minutes} phút`;
+    }
+};
+
+const getStatistics = async () => {
+    try {
+        const totalPlans = await dbGet('SELECT COUNT(*) as count FROM vps_plans WHERE status = "active"');
+        const totalUsers = await dbGet('SELECT COUNT(*) as count FROM users WHERE role = "user"');
+        const totalInstances = await dbGet('SELECT COUNT(*) as count FROM vps_instances');
+        const runningInstances = await dbGet('SELECT COUNT(*) as count FROM vps_instances WHERE status = "running"');
+        const totalRevenue = await dbGet('SELECT SUM(total_cost) as total FROM vps_instances');
+        const totalPosts = await dbGet('SELECT COUNT(*) as count FROM posts');
+
+        return {
+            totalPlans: totalPlans.count || 0,
+            totalUsers: totalUsers.count || 0,
+            totalInstances: totalInstances.count || 0,
+            runningInstances: runningInstances.count || 0,
+            totalRevenue: totalRevenue.total || 0,
+            totalPosts: totalPosts.count || 0
+        };
+    } catch (err) {
+        console.error('Error getting statistics:', err);
+        return {
+            totalPlans: 0,
+            totalUsers: 0,
+            totalInstances: 0,
+            runningInstances: 0,
+            totalRevenue: 0,
+            totalPosts: 0
+        };
+    }
+};
+
+// Export all functions
 module.exports = {
-    // Authentication functions
+    // Authentication
     authenticateUser,
     registerUser,
     
-    // Utility functions
-    formatPrice,
-    validateProduct,
-    validatePost,
-    createSlug,
-    generateUniqueSlug,
-    checkSlugExists,
+    // User Management
+    getAllUsers,
+    getUserById,
+    addUser,
+    updateUser,
+    deleteUser,
     
-    // Cart functions
-    addToCart,
-    getCart,
-    getCartItems,
-    removeFromCart,
-    updateCartQuantity,
-    processPurchase,
+    // Wallet Management
+    getUserBalance,
+    addUserBalance,
+    subtractUserBalance,
+    getUserTransactions,
     
-    // Product functions
-    getAllProducts,
-    getProductById,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    searchProducts,
-    
-    // Post functions
+    // Posts Management
     getAllPosts,
     getPostById,
     getPostBySlug,
     addPost,
     updatePost,
     deletePost,
-    searchPosts,
     
-    // User functions
-    getAllUsers,
-    getUserById,
-    updateUserRole,
-    deleteUser,
+    // Categories
+    getAllCategories,
+    addCategory,
     
-    // Statistics functions
+    // Media Management
+    saveMediaFile,
+    getMediaFiles,
+    
+    // VPS Functions
+    getAllVpsPlans,
+    getVpsPlanById,
+    createVpsInstance,
+    getUserVpsInstances,
+    
+    // Deposits
+    createDepositRequest,
+    getDepositRequests,
+    processDepositRequest,
+    
+    // Statistics
     getStatistics,
-    getRecentData
+    
+    // Utilities
+    formatPrice,
+    createSlug,
+    generateUniqueSlug,
+    generateRandomIP,
+    generateRandomPassword,
+    getTimeRemaining
 };

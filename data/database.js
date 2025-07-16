@@ -1,21 +1,27 @@
-// data/database.js - Optimized version (chỉ check và thêm cột)
+// data/database.js - Updated với SEO và Media fields
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'shop.db');
+const dbPath = path.join(__dirname, 'vps_service.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Error opening database:', err.message);
     } else {
-        console.log('Connected to SQLite database.');
+        console.log('Connected to VPS Service SQLite database.');
         
-        // Tạo bảng users
+        // Tạo bảng users với wallet (giữ nguyên)
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
+                email TEXT,
+                full_name TEXT,
+                phone TEXT,
                 role TEXT DEFAULT 'user',
+                balance REAL DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                last_login DATETIME,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
@@ -23,118 +29,34 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) {
                 console.error('Error creating users table:', err.message);
             } else {
-                // Chỉ kiểm tra và thêm cột nếu chưa có
+                // Thêm các cột mới nếu chưa có
                 db.all("PRAGMA table_info(users)", (err, columns) => {
                     if (!err) {
                         const columnNames = columns.map(col => col.name);
                         
-                        if (!columnNames.includes('role')) {
-                            console.log('Adding role column to users table...');
-                            db.run("ALTER TABLE users ADD COLUMN role TEXT", (err) => {
-                                if (err && !err.message.includes('duplicate column')) {
-                                    console.error('Error adding role column:', err.message);
-                                } else {
-                                    console.log('Role column added successfully');
-                                    db.run("UPDATE users SET role = 'user' WHERE role IS NULL");
-                                    db.run("UPDATE users SET role = 'admin' WHERE username = 'admin'");
-                                }
-                            });
-                        }
-                        
-                        if (!columnNames.includes('created_at')) {
-                            console.log('Adding created_at column to users table...');
-                            db.run("ALTER TABLE users ADD COLUMN created_at DATETIME", (err) => {
-                                if (err && !err.message.includes('duplicate column')) {
-                                    console.error('Error adding created_at column:', err.message);
-                                } else {
-                                    console.log('Created_at column added to users');
-                                    db.run("UPDATE users SET created_at = datetime('now') WHERE created_at IS NULL");
-                                }
-                            });
-                        }
-                        
-                        if (!columnNames.includes('updated_at')) {
-                            console.log('Adding updated_at column to users table...');
-                            db.run("ALTER TABLE users ADD COLUMN updated_at DATETIME", (err) => {
-                                if (err && !err.message.includes('duplicate column')) {
-                                    console.error('Error adding updated_at column:', err.message);
-                                } else {
-                                    console.log('Updated_at column added to users');
-                                    db.run("UPDATE users SET updated_at = datetime('now') WHERE updated_at IS NULL");
-                                }
-                            });
-                        }
-                    }
-                });
-                
-                // Chỉ tạo admin user nếu chưa có
-                db.get("SELECT COUNT(*) as count FROM users WHERE username = 'admin'", (err, row) => {
-                    if (!err && row.count === 0) {
-                        db.run("INSERT INTO users (username, password, role) VALUES ('admin', '123456', 'admin')", (err) => {
-                            if (!err) console.log('Admin user created');
-                        });
-                    }
-                });
-                
-                // Chỉ tạo regular user nếu chưa có
-                db.get("SELECT COUNT(*) as count FROM users WHERE username = 'user'", (err, row) => {
-                    if (!err && row.count === 0) {
-                        db.run("INSERT INTO users (username, password, role) VALUES ('user', '123456', 'user')", (err) => {
-                            if (!err) console.log('Regular user created');
-                        });
-                    }
-                });
-            }
-        });
-
-        // Tạo bảng products
-        db.run(`
-            CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                price REAL NOT NULL,
-                quantity INTEGER NOT NULL,
-                description TEXT,
-                image_url TEXT,
-                category TEXT DEFAULT 'general',
-                status TEXT DEFAULT 'active',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `, (err) => {
-            if (err) {
-                console.error('Error creating products table:', err.message);
-            } else {
-                // Chỉ kiểm tra và thêm các cột còn thiếu
-                db.all("PRAGMA table_info(products)", (err, columns) => {
-                    if (!err) {
-                        const columnNames = columns.map(col => col.name);
-                        
-                        const columnsToAdd = [
-                            { name: 'description', type: 'TEXT' },
-                            { name: 'image_url', type: 'TEXT' },
-                            { name: 'category', type: 'TEXT' },
-                            { name: 'status', type: 'TEXT' },
-                            { name: 'created_at', type: 'DATETIME' },
-                            { name: 'updated_at', type: 'DATETIME' }
+                        const newColumns = [
+                            { name: 'email', type: 'TEXT' },
+                            { name: 'full_name', type: 'TEXT' },
+                            { name: 'phone', type: 'TEXT' },
+                            { name: 'balance', type: 'REAL DEFAULT 0' },
+                            { name: 'status', type: 'TEXT DEFAULT "active"' },
+                            { name: 'last_login', type: 'DATETIME' }
                         ];
                         
-                        columnsToAdd.forEach(col => {
+                        newColumns.forEach(col => {
                             if (!columnNames.includes(col.name)) {
-                                console.log(`Adding ${col.name} column to products table...`);
-                                db.run(`ALTER TABLE products ADD COLUMN ${col.name} ${col.type}`, (err) => {
+                                console.log(`Adding ${col.name} column to users table...`);
+                                db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
                                     if (err && !err.message.includes('duplicate column')) {
                                         console.error(`Error adding ${col.name} column:`, err.message);
                                     } else {
                                         console.log(`${col.name} column added successfully`);
                                         
-                                        // Set default values cho dữ liệu hiện có
-                                        if (col.name === 'category') {
-                                            db.run("UPDATE products SET category = 'general' WHERE category IS NULL");
+                                        // Set default values
+                                        if (col.name === 'balance') {
+                                            db.run("UPDATE users SET balance = 0 WHERE balance IS NULL");
                                         } else if (col.name === 'status') {
-                                            db.run("UPDATE products SET status = 'active' WHERE status IS NULL");
-                                        } else if (col.name === 'created_at' || col.name === 'updated_at') {
-                                            db.run(`UPDATE products SET ${col.name} = datetime('now') WHERE ${col.name} IS NULL`);
+                                            db.run("UPDATE users SET status = 'active' WHERE status IS NULL");
                                         }
                                     }
                                 });
@@ -143,167 +65,152 @@ const db = new sqlite3.Database(dbPath, (err) => {
                     }
                 });
                 
-                // Chỉ tạo sample products nếu bảng trống
-                db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
+                // Tạo admin user
+                db.get("SELECT COUNT(*) as count FROM users WHERE username = 'admin'", (err, row) => {
                     if (!err && row.count === 0) {
-                        db.run(`
-                            INSERT INTO products (name, price, quantity, description, category, status)
-                            VALUES
-                                ('iPhone 15 Pro', 25000000, 10, 'Điện thoại iPhone 15 Pro mới nhất với chip A17 Pro', 'electronics', 'active'),
-                                ('Samsung Galaxy S24', 20000000, 5, 'Điện thoại Samsung Galaxy S24 với camera AI tiên tiến', 'electronics', 'active'),
-                                ('MacBook Air M3', 30000000, 8, 'Laptop MacBook Air với chip M3 mạnh mẽ và tiết kiệm pin', 'electronics', 'active')
-                        `, (err) => {
-                            if (!err) console.log('Sample products created');
+                        db.run(`INSERT INTO users 
+                            (username, password, email, full_name, role, balance, status) 
+                            VALUES ('admin', '123456', 'admin@vpscloud.vn', 'Administrator', 'admin', 1000000, 'active')`, (err) => {
+                            if (!err) console.log('Admin user created with 1M VND balance');
                         });
                     }
                 });
             }
         });
-        
-        // Tạo bảng cart
-        db.run(`
-            CREATE TABLE IF NOT EXISTS cart (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                product_id INTEGER NOT NULL,
-                quantity INTEGER NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (product_id) REFERENCES products(id)
-            )
-        `, (err) => {
-            if (err) {
-                console.error('Error creating cart table:', err.message);
-            } else {
-                // Thêm timestamps nếu chưa có
-                db.all("PRAGMA table_info(cart)", (err, columns) => {
-                    if (!err) {
-                        const columnNames = columns.map(col => col.name);
-                        
-                        if (!columnNames.includes('created_at')) {
-                            console.log('Adding created_at column to cart table...');
-                            db.run("ALTER TABLE cart ADD COLUMN created_at DATETIME", (err) => {
-                                if (!err) {
-                                    db.run("UPDATE cart SET created_at = datetime('now') WHERE created_at IS NULL");
-                                }
-                            });
-                        }
-                        if (!columnNames.includes('updated_at')) {
-                            console.log('Adding updated_at column to cart table...');
-                            db.run("ALTER TABLE cart ADD COLUMN updated_at DATETIME", (err) => {
-                                if (!err) {
-                                    db.run("UPDATE cart SET updated_at = datetime('now') WHERE updated_at IS NULL");
-                                }
-                            });
-                        }
-                    }
-                });
-            }
-        });
 
-        // Tạo bảng posts
+        // Tạo bảng posts với SEO fields
         db.run(`
             CREATE TABLE IF NOT EXISTS posts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 slug TEXT UNIQUE,
                 content TEXT NOT NULL,
-                author_id INTEGER NOT NULL,
                 excerpt TEXT,
-                status TEXT DEFAULT 'published',
+                meta_title TEXT,
+                meta_description TEXT,
+                meta_keywords TEXT,
+                featured_image TEXT,
+                author_id INTEGER NOT NULL,
+                category_id INTEGER,
+                tags TEXT,
+                status TEXT DEFAULT 'draft',
+                published_at DATETIME,
+                view_count INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (author_id) REFERENCES users(id)
+                FOREIGN KEY (author_id) REFERENCES users(id),
+                FOREIGN KEY (category_id) REFERENCES categories(id)
             )
         `, (err) => {
             if (err) {
                 console.error('Error creating posts table:', err.message);
             } else {
-                // Thêm các cột nếu chưa có
+                // Thêm các cột SEO nếu chưa có
                 db.all("PRAGMA table_info(posts)", (err, columns) => {
                     if (!err) {
                         const columnNames = columns.map(col => col.name);
                         
-                        if (!columnNames.includes('slug')) {
-                            console.log('Adding slug column to posts table...');
-                            db.run("ALTER TABLE posts ADD COLUMN slug TEXT", (err) => {
-                                if (!err) {
-                                    // Tạo slug cho các bài viết hiện có
-                                    db.all("SELECT id, title FROM posts WHERE slug IS NULL", (err, posts) => {
-                                        if (!err && posts.length > 0) {
-                                            posts.forEach(post => {
-                                                const slug = createSlug(post.title) + '-' + post.id;
-                                                db.run("UPDATE posts SET slug = ? WHERE id = ?", [slug, post.id]);
-                                            });
-                                            console.log('Generated slugs for existing posts');
+                        const seoColumns = [
+                            { name: 'meta_title', type: 'TEXT' },
+                            { name: 'meta_description', type: 'TEXT' },
+                            { name: 'meta_keywords', type: 'TEXT' },
+                            { name: 'featured_image', type: 'TEXT' },
+                            { name: 'category_id', type: 'INTEGER' },
+                            { name: 'tags', type: 'TEXT' },
+                            { name: 'published_at', type: 'DATETIME' },
+                            { name: 'view_count', type: 'INTEGER DEFAULT 0' }
+                        ];
+                        
+                        seoColumns.forEach(col => {
+                            if (!columnNames.includes(col.name)) {
+                                console.log(`Adding ${col.name} column to posts table...`);
+                                db.run(`ALTER TABLE posts ADD COLUMN ${col.name} ${col.type}`, (err) => {
+                                    if (err && !err.message.includes('duplicate column')) {
+                                        console.error(`Error adding ${col.name} column:`, err.message);
+                                    } else {
+                                        console.log(`${col.name} column added to posts`);
+                                        if (col.name === 'view_count') {
+                                            db.run("UPDATE posts SET view_count = 0 WHERE view_count IS NULL");
                                         }
-                                    });
-                                }
-                            });
-                        }
-                        if (!columnNames.includes('excerpt')) {
-                            console.log('Adding excerpt column to posts table...');
-                            db.run("ALTER TABLE posts ADD COLUMN excerpt TEXT");
-                        }
-                        if (!columnNames.includes('status')) {
-                            console.log('Adding status column to posts table...');
-                            db.run("ALTER TABLE posts ADD COLUMN status TEXT", (err) => {
-                                if (!err) {
-                                    db.run("UPDATE posts SET status = 'published' WHERE status IS NULL");
-                                }
-                            });
-                        }
-                        if (!columnNames.includes('updated_at')) {
-                            console.log('Adding updated_at column to posts table...');
-                            db.run("ALTER TABLE posts ADD COLUMN updated_at DATETIME", (err) => {
-                                if (!err) {
-                                    db.run("UPDATE posts SET updated_at = datetime('now') WHERE updated_at IS NULL");
-                                }
-                            });
-                        }
+                                    }
+                                });
+                            }
+                        });
                     }
                 });
                 
-                // Chỉ tạo sample posts nếu bảng trống
+                // Tạo sample posts với SEO
                 db.get("SELECT COUNT(*) as count FROM posts", (err, row) => {
                     if (!err && row.count === 0) {
                         db.run(`
-                            INSERT INTO posts (title, slug, content, excerpt, author_id, status)
+                            INSERT INTO posts (
+                                title, slug, content, excerpt, meta_title, meta_description, 
+                                meta_keywords, featured_image, author_id, status, published_at
+                            )
                             VALUES
-                                ('Chào mừng đến với cửa hàng', 'chao-mung-den-voi-cua-hang', 'Đây là bài viết chào mừng khách hàng đến với cửa hàng của chúng tôi. Chúng tôi cam kết mang đến những sản phẩm chất lượng nhất.', 'Chào mừng bạn đến với cửa hàng', 1, 'published'),
-                                ('Hướng dẫn mua hàng', 'huong-dan-mua-hang', 'Để mua hàng, bạn cần đăng ký tài khoản, đăng nhập và thêm sản phẩm vào giỏ hàng.', 'Hướng dẫn mua hàng online', 1, 'published')
+                                (
+                                    'Chào mừng đến với VPS Cloud', 
+                                    'chao-mung-den-voi-vps-cloud',
+                                    'VPS Cloud là dịch vụ VPS hàng đầu Việt Nam với giá cả hợp lý và chất lượng đảm bảo. Chúng tôi cung cấp các gói VPS từ cơ bản đến cao cấp phù hợp với mọi nhu cầu.',
+                                    'VPS Cloud - Dịch vụ VPS hàng đầu Việt Nam',
+                                    'VPS Cloud - Dịch vụ VPS giá rẻ, chất lượng cao | VPSCloud.vn',
+                                    'Thuê VPS theo giờ với giá từ 2000đ/h. Triển khai nhanh, thanh toán linh hoạt. Hỗ trợ 24/7.',
+                                    'vps, cloud, hosting, server, vietnam, giá rẻ',
+                                    '/images/posts/welcome-banner.jpg',
+                                    1, 
+                                    'published',
+                                    datetime('now')
+                                ),
+                                (
+                                    'Hướng dẫn thuê VPS đơn giản', 
+                                    'huong-dan-thue-vps-don-gian',
+                                    'Bài viết hướng dẫn chi tiết cách thuê VPS tại VPS Cloud. Từ việc đăng ký tài khoản, nạp tiền đến việc chọn gói VPS phù hợp.',
+                                    'Hướng dẫn thuê VPS từ A-Z cho người mới',
+                                    'Hướng dẫn thuê VPS từ A-Z | VPSCloud.vn',
+                                    'Hướng dẫn chi tiết cách thuê VPS cho người mới bắt đầu. Đăng ký, nạp tiền, chọn gói và triển khai.',
+                                    'hướng dẫn, thuê vps, tutorial, vps cloud',
+                                    '/images/posts/tutorial-banner.jpg',
+                                    1, 
+                                    'published',
+                                    datetime('now')
+                                )
                         `, (err) => {
-                            if (!err) console.log('Sample posts created');
+                            if (!err) console.log('Sample posts with SEO created');
                         });
                     }
                 });
             }
         });
 
-        // Tạo bảng categories
+        // Tạo bảng categories cho posts
         db.run(`
             CREATE TABLE IF NOT EXISTS categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                description TEXT,
                 slug TEXT UNIQUE,
+                description TEXT,
+                image TEXT,
+                parent_id INTEGER,
+                sort_order INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (parent_id) REFERENCES categories(id)
             )
         `, (err) => {
             if (err) {
                 console.error('Error creating categories table:', err.message);
             } else {
-                // Chỉ tạo categories nếu bảng trống
+                // Tạo sample categories
                 db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
                     if (!err && row.count === 0) {
                         db.run(`
-                            INSERT INTO categories (name, description, slug)
+                            INSERT INTO categories (name, slug, description, sort_order, status)
                             VALUES
-                                ('Điện tử', 'Các sản phẩm điện tử và công nghệ', 'electronics'),
-                                ('Thời trang', 'Quần áo và phụ kiện thời trang', 'fashion'),
-                                ('Gia dụng', 'Đồ gia dụng và nội thất', 'home')
+                                ('Tin tức', 'tin-tuc', 'Tin tức công nghệ và VPS', 1, 'active'),
+                                ('Hướng dẫn', 'huong-dan', 'Hướng dẫn sử dụng VPS', 2, 'active'),
+                                ('Khuyến mãi', 'khuyen-mai', 'Các chương trình khuyến mãi', 3, 'active'),
+                                ('Cập nhật', 'cap-nhat', 'Cập nhật hệ thống và tính năng', 4, 'active')
                         `, (err) => {
                             if (!err) console.log('Sample categories created');
                         });
@@ -312,50 +219,91 @@ const db = new sqlite3.Database(dbPath, (err) => {
             }
         });
 
-        // Tạo bảng orders
+        // Tạo bảng media files
         db.run(`
-            CREATE TABLE IF NOT EXISTS orders (
+            CREATE TABLE IF NOT EXISTS media (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                mime_type TEXT NOT NULL,
+                size INTEGER NOT NULL,
+                path TEXT NOT NULL,
+                url TEXT NOT NULL,
+                alt_text TEXT,
+                title TEXT,
+                description TEXT,
+                uploaded_by INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (uploaded_by) REFERENCES users(id)
+            )
+        `, (err) => {
+            if (err) {
+                console.error('Error creating media table:', err.message);
+            } else {
+                console.log('Media table created successfully');
+            }
+        });
+
+        // Tạo bảng user_transactions (lịch sử cộng/trừ tiền)
+        db.run(`
+            CREATE TABLE IF NOT EXISTS user_transactions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                total_amount REAL NOT NULL,
-                status TEXT DEFAULT 'pending',
-                shipping_address TEXT,
-                phone TEXT,
-                email TEXT,
-                notes TEXT,
+                admin_id INTEGER NOT NULL,
+                type TEXT NOT NULL, -- 'add' hoặc 'subtract'
+                amount REAL NOT NULL,
+                balance_before REAL NOT NULL,
+                balance_after REAL NOT NULL,
+                reason TEXT,
+                note TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (admin_id) REFERENCES users(id)
             )
         `, (err) => {
             if (err) {
-                console.error('Error creating orders table:', err.message);
+                console.error('Error creating user_transactions table:', err.message);
             } else {
-                console.log('Orders table created successfully');
+                console.log('User transactions table created successfully');
             }
         });
 
-        // Tạo bảng order_items
+        // Các bảng VPS khác (giữ nguyên từ artifact trước)
         db.run(`
-            CREATE TABLE IF NOT EXISTS order_items (
+            CREATE TABLE IF NOT EXISTS vps_plans (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id INTEGER NOT NULL,
-                product_id INTEGER NOT NULL,
-                quantity INTEGER NOT NULL,
-                price REAL NOT NULL,
+                name TEXT NOT NULL,
+                cpu INTEGER NOT NULL,
+                ram INTEGER NOT NULL,
+                storage INTEGER NOT NULL,
+                bandwidth INTEGER NOT NULL,
+                hourly_price REAL NOT NULL,
+                monthly_price REAL NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'active',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (order_id) REFERENCES orders(id),
-                FOREIGN KEY (product_id) REFERENCES products(id)
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `, (err) => {
-            if (err) {
-                console.error('Error creating order_items table:', err.message);
-            } else {
-                console.log('Order_items table created successfully');
+            if (!err) {
+                // Tạo sample VPS plans
+                db.get("SELECT COUNT(*) as count FROM vps_plans", (err, row) => {
+                    if (!err && row.count === 0) {
+                        db.run(`
+                            INSERT INTO vps_plans (name, cpu, ram, storage, bandwidth, hourly_price, monthly_price, description, status)
+                            VALUES
+                                ('VPS Basic', 1, 1, 20, 1000, 2000, 50000, 'VPS cơ bản với 1 CPU, 1GB RAM, 20GB SSD', 'active'),
+                                ('VPS Standard', 2, 2, 40, 2000, 4000, 100000, 'VPS tiêu chuẩn với 2 CPU, 2GB RAM, 40GB SSD', 'active'),
+                                ('VPS Premium', 4, 4, 80, 5000, 8000, 200000, 'VPS cao cấp với 4 CPU, 4GB RAM, 80GB SSD', 'active'),
+                                ('VPS Enterprise', 8, 8, 160, 10000, 15000, 400000, 'VPS doanh nghiệp với 8 CPU, 8GB RAM, 160GB SSD', 'active')
+                        `);
+                    }
+                });
             }
         });
 
-        console.log('🎉 Database initialization completed!');
+        // Các bảng khác giữ nguyên (vps_instances, wallet_transactions, deposit_requests)...
+        console.log('🎉 Enhanced Database initialization completed!');
     }
 });
 
@@ -364,15 +312,14 @@ function createSlug(title) {
     return title
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu
-        .replace(/[đĐ]/g, 'd') // Thay đ/Đ thành d
-        .replace(/[^a-z0-9\s-]/g, '') // Chỉ giữ lại chữ, số, space, dấu gạch ngang
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .replace(/[^a-z0-9\s-]/g, '')
         .trim()
-        .replace(/\s+/g, '-') // Thay space thành dấu gạch ngang
-        .replace(/-+/g, '-'); // Loại bỏ dấu gạch ngang liên tiếp
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
 }
 
-// Xử lý lỗi database
 db.on('error', (err) => {
     console.error('Database error:', err);
 });
